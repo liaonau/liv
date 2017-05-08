@@ -1,36 +1,39 @@
 #pragma once
 
+#include <lua.h>
+
 #include <glib.h>
 #include <gtk/gtk.h>
 
 #define APPNAME "liv"
 
-typedef struct
-{
-    /*gboolean onecolumn;*/
-    /*gboolean checkbox;*/
-    gboolean numbers;
-    /*gboolean underline;*/
-    /*gboolean color;*/
-    /*gboolean radiobox;*/
-    /*gboolean initial;*/
-    /*gboolean fullattr;*/
-    /*gboolean whitelines;*/
-    /*gchar*   foreground;*/
-    gchar*   background;
-
-    gchar*   execpath;
-
-    gchar**  infiles;
-}
-conf_t;
+typedef GdkPoint point;
 
 typedef struct
 {
     gchar*    filename;
-    GtkImage* img;
+    GtkImage* thumb;
+    point     size;
+    double    aspect;
+    gboolean  marked;
+    guint     index;
 }
 image_t;
 
+
+typedef struct
+{
+    gint  max_thumb_size;
+    point window_size;
+}
+conf_t;
+
 conf_t conf;
-GArray* images;
+
+gint pointer;
+GArray* files;
+
+gchar** infiles;
+gchar*  execpath;
+
+lua_State* L;
