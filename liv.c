@@ -1,5 +1,10 @@
+#include "conf.h"
+#include "opts.h"
+#include "util.h"
+
 #include <stdlib.h>
 #include <unistd.h>
+#include <locale.h>
 
 #include <gtk/gtk.h>
 #include <glib/gprintf.h>
@@ -8,69 +13,39 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
-#include "filenamenode.h"
-
-const char* programname = "lua image viewer";
-const char* shortprogramname = "liv";
-
-struct FilenameNode* selectedPicture;
 GtkWindow* window;
 GtkImage* image;
 lua_State *L;
 
-static gboolean open_image(struct FilenameNode *filenamenode)
+void read_image(gchar* filename)
 {
-    gtk_image_set_from_file(image, filenamenode->filename);
-
-    const GdkPixbuf *pb = gtk_image_get_pixbuf(image);
-    if (pb != NULL)
-    {
-        /*gtk_window_resize(window, gdk_pixbuf_get_width(pb), gdk_pixbuf_get_height(pb));*/
-        gtk_window_set_title(GTK_WINDOW(window), filenamenode->filename);
-        return TRUE;
-    }
-    else
-    {
-        g_printf("Couldn't open %s\n", filenamenode->filename);
-        deleteFilenameNode(filenamenode);
-        return FALSE;
-    }
+    warn(filename);
 }
 
-void clear()
+inline static void read_data(void)
 {
-    deleteAllFilenameNodes(selectedPicture);
+    gchar** p = conf.infiles;
+    for (register gint i = 0; p[i] && p ; i++)
+        read_image(p[i]);
 }
 
 static gint luaI_quit(lua_State *L)
 {
-    clear();
     exit(0);
 }
 
 static int luaI_next_image(lua_State *L)
 {
-    selectedPicture = selectedPicture->next;
-    while(!open_image(selectedPicture))
-        selectedPicture = selectedPicture->next;
     return 0;
 }
 
 static int luaI_prev_image(lua_State *L)
 {
-    selectedPicture = selectedPicture->prev;
-    while(!open_image(selectedPicture))
-        selectedPicture = selectedPicture->prev;
     return 0;
 }
 
 static int luaI_rotate(lua_State *L)
 {
-    GdkPixbufRotation rotation = GDK_PIXBUF_ROTATE_CLOCKWISE;
-    gboolean clockwise = lua_toboolean(L, 1);
-    if (!clockwise)
-        rotation = GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE;
-    gtk_image_set_from_pixbuf(image, gdk_pixbuf_rotate_simple(gtk_image_get_pixbuf(image), rotation));
     return 0;
 }
 
@@ -78,10 +53,7 @@ static gboolean lua_init()
 {
     L = luaL_newstate();
     if (L == NULL)
-    {
-        g_fprintf(stderr, "%s\n", "couldn't initialize Lua");
         return FALSE;
-    }
     luaL_openlibs(L);
     lua_pushcfunction(L, luaI_next_image);
     lua_setglobal(L, "next_image");
@@ -152,16 +124,16 @@ static void create_window()
     GtkWidget* box;
 
     window = (GtkWindow*)gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(window), programname);
+    gtk_window_set_title(GTK_WINDOW(window), APPNAME);
     box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
 
-    image = (GtkImage*)gtk_image_new();
-    open_image(selectedPicture);
+    /*image = (GtkImage*)gtk_image_new();*/
+    /*open_image(selectedPicture);*/
 
-    gtk_box_pack_start(GTK_BOX(box), (GtkWidget*)image, TRUE, TRUE, 0);
-    gtk_container_add(GTK_CONTAINER(window), box);
+    /*gtk_box_pack_start(GTK_BOX(box), (GtkWidget*)image, TRUE, TRUE, 0);*/
+    /*gtk_container_add(GTK_CONTAINER(window), box);*/
 
-    g_signal_connect(window, "key-press-event", G_CALLBACK(cb_key), NULL);
+    /*g_signal_connect(window, "key-press-event", G_CALLBACK(cb_key), NULL);*/
     g_signal_connect(window, "destroy",         G_CALLBACK(gtk_main_quit), NULL);
 
     gtk_widget_show_all((GtkWidget*)window);
@@ -169,21 +141,18 @@ static void create_window()
 
 gint main(gint argc, gchar **argv)
 {
-    if (argc < 2)
-    {
-        g_printf("Please specify a image to display\n");
-        return 1;
-    }
+    setlocale(LC_ALL, "");
     if (!lua_init())
-        return 1;
+        fatal("can't init Lua");
     if (!lua_loadrc())
-        return 1;
+        fatal("can't load rc.lua");
+    parseopts(argc, argv);
 
-    loadFilenames(argc, argv);
+    read_data();
+
     gtk_init(&argc, &argv);
     create_window();
     gtk_main();
 
-    clear();
     return 0;
 }
