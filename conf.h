@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glib.h>
+#include <gtk/gtk.h>
 
 #define APPNAME "liv"
 
@@ -21,6 +22,15 @@ typedef struct
     gchar*   execpath;
 
     gchar**  infiles;
-} conf_t;
+}
+conf_t;
+
+typedef struct
+{
+    gchar*    filename;
+    GtkImage* img;
+}
+image_t;
 
 conf_t conf;
+GArray* images;

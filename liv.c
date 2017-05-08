@@ -17,16 +17,36 @@ GtkWindow* window;
 GtkImage* image;
 lua_State *L;
 
-void read_image(gchar* filename)
+void read_image(const gchar* filename)
 {
-    warn(filename);
+    GdkPixbuf* pixbuf = gdk_pixbuf_new_from_file(filename, NULL);
+    if (pixbuf != NULL)
+    {
+        warn("loading %s", filename);
+        image_t* image  = g_malloc(sizeof(image_t));
+        image->filename = g_strdup(filename);
+        image->img = (GtkImage*)gtk_image_new();
+        /*gtk_image_set_from_pixbuf(image->img, pixbuf);*/
+        gtk_image_set_from_file(image->img, filename);
+        g_object_unref(pixbuf);
+        g_array_append_val(images, image);
+    }
+    else
+        warn("can't load %s", filename);
 }
 
 inline static void read_data(void)
 {
     gchar** p = conf.infiles;
     for (register gint i = 0; p[i] && p ; i++)
+    {
         read_image(p[i]);
+    }
+    for (register guint i = 0; i < images->len; i++)
+    {
+        image_t* img = g_array_index(images, image_t*, i);
+        warn(img->filename);
+    }
 }
 
 static gint luaI_quit(lua_State *L)
@@ -147,6 +167,8 @@ gint main(gint argc, gchar **argv)
     if (!lua_loadrc())
         fatal("can't load rc.lua");
     parseopts(argc, argv);
+
+    images = g_array_new(TRUE, FALSE, sizeof(image_t*));
 
     read_data();
 
