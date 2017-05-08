@@ -11,15 +11,15 @@ typedef GdkPoint point;
 
 typedef struct
 {
-    gchar*    filename;
-    GtkImage* thumb;
-    point     size;
-    double    aspect;
-    gboolean  marked;
-    guint     index;
+    gchar*     filename;
+    GtkImage*  thumb;
+    GtkImage*  image;
+    GdkPixbuf* pixbuf;
+    point      size;
+    gboolean   marked;
+    guint      index;
 }
-image_t;
-
+file_t;
 
 typedef struct
 {

@@ -15,7 +15,6 @@
 GtkWindow* window;
 GtkWidget* swindow;
 GtkWidget* grid;
-GtkImage*  current;
 gboolean   preview;
 
 void read_image(const gchar* filename)
@@ -23,14 +22,21 @@ void read_image(const gchar* filename)
     GdkPixbuf* pixbuf = gdk_pixbuf_new_from_file(filename, NULL);
     if (GDK_IS_PIXBUF(pixbuf))
     {
-        image_t* image  = g_malloc(sizeof(image_t));
+        file_t* image  = g_malloc(sizeof(file_t));
+
         image->filename = g_strdup(filename);
         image->thumb    = (GtkImage*)gtk_image_new_from_pixbuf(pixbuf);
+        image->image    = (GtkImage*)gtk_image_new_from_pixbuf(pixbuf);
+        image->pixbuf   = pixbuf;
         image->size.x   = gdk_pixbuf_get_width(pixbuf);
         image->size.y   = gdk_pixbuf_get_height(pixbuf);
         image->index    = files->len;
         image->marked   = FALSE;
-        g_object_unref(pixbuf);
+
+        g_object_ref(image->image);
+        g_object_ref(image->thumb);
+        g_object_ref(image->pixbuf);
+
         g_array_append_val(files, image);
     }
     else
@@ -42,7 +48,7 @@ static gint calculate_max_thumb_size(void)
     gint mats = 0;
     for (guint i = 0; i < files->len; i++)
     {
-        image_t* image = g_array_index(files, image_t*, i);
+        file_t* image = g_array_index(files, file_t*, i);
         point s = image->size;
         mats = MAX(mats, s.x);
         mats = MAX(mats, s.y);
@@ -86,7 +92,7 @@ static void set_previews_size(void)
     gint mts = calculate_max_thumb_size();
     for (guint i = 0; i < files->len; i++)
     {
-        image_t* image = g_array_index(files, image_t*, i);
+        file_t* image = g_array_index(files, file_t*, i);
         GtkImage* img = image->thumb;
         point    size = image->size;
         if (size.x > mts || size.y > mts)
@@ -111,7 +117,7 @@ static void fill_grid(void)
     gint height = 0;
     for (guint i = 0; i < files->len; i++)
     {
-        image_t* image = g_array_index(files, image_t*, i);
+        file_t* image = g_array_index(files, file_t*, i);
         GtkImage* img = image->thumb;
         GdkPixbuf* pixbuf = gtk_image_get_pixbuf(img);
         gint pw, ph;
@@ -123,7 +129,7 @@ static void fill_grid(void)
     }
     for (guint i = 0; i < files->len; i++)
     {
-        image_t* image = g_array_index(files, image_t*, i);
+        file_t* image = g_array_index(files, file_t*, i);
         GtkImage* img = image->thumb;
         gint left = i % square;
         gint top  = (i - (i % square)) / square;
@@ -144,23 +150,21 @@ static gint luaI_quit(lua_State *L)
     exit(0);
 }
 
-static void clear_swindow(GtkWidget* widget, gpointer cbdta)
+static void clear_swindow_cb(GtkWidget* widget, gpointer cbdta)
 {
     gtk_container_remove(GTK_CONTAINER(swindow), widget);
 }
 
-static void load_image()
+static void clear_swindow()
 {
-    image_t* image = g_array_index(files, image_t*, pointer);
-    GdkPixbuf* pixbuf = gdk_pixbuf_new_from_file(image->filename, NULL);
-    if (GDK_IS_PIXBUF(pixbuf))
-    {
-        current = (GtkImage*)gtk_image_new_from_pixbuf(pixbuf);
-        g_object_unref(pixbuf);
-    }
-    else
-        current = (GtkImage*)gtk_image_new();
-    gtk_container_foreach(GTK_CONTAINER(swindow), clear_swindow, NULL);
+    gtk_container_foreach(GTK_CONTAINER(swindow), clear_swindow_cb, NULL);
+}
+
+static void show_image()
+{
+    file_t* file = g_array_index(files, file_t*, pointer);
+    GtkImage* current = file->image;
+    clear_swindow();
     gtk_container_add(GTK_CONTAINER(swindow), (GtkWidget*)current);
     gtk_widget_show((GtkWidget*)current);
 }
@@ -193,15 +197,15 @@ static int luaI_set_image(lua_State *L)
     if (!preview)
     {
         if (prev_pointer != pointer)
-            load_image();
+            show_image();
     }
     return 0;
 }
 
 static int luaI_flip(lua_State *L)
 {
-    if (preview)
-        return 0;
+    file_t* file = g_array_index(files, file_t*, pointer);
+    GtkImage* current = file->image;
     gboolean horizontal = lua_toboolean(L, 1);
     GdkPixbuf* old_pixbuf = gtk_image_get_pixbuf(current);
     if (GDK_IS_PIXBUF(old_pixbuf))
@@ -215,8 +219,8 @@ static int luaI_flip(lua_State *L)
 
 static int luaI_scale(lua_State *L)
 {
-    if (preview)
-        return 0;
+    file_t* file = g_array_index(files, file_t*, pointer);
+    GtkImage* current = file->image;
     GdkPixbuf* old_pixbuf = gtk_image_get_pixbuf(current);
     if (GDK_IS_PIXBUF(old_pixbuf))
     {
@@ -235,8 +239,8 @@ static int luaI_scale(lua_State *L)
 
 static int luaI_rotate(lua_State *L)
 {
-    if (preview)
-        return 0;
+    file_t* file = g_array_index(files, file_t*, pointer);
+    GtkImage* current = file->image;
     GdkPixbufRotation rotation = GDK_PIXBUF_ROTATE_CLOCKWISE;
     gboolean clockwise = lua_toboolean(L, 1);
     if (!clockwise)
@@ -244,6 +248,14 @@ static int luaI_rotate(lua_State *L)
     GdkPixbuf* pixbuf = gtk_image_get_pixbuf(current);
     if (GDK_IS_PIXBUF(pixbuf))
         gtk_image_set_from_pixbuf(current, gdk_pixbuf_rotate_simple(pixbuf, rotation));
+    return 0;
+}
+
+static int luaI_reset(lua_State *L)
+{
+    file_t* file = g_array_index(files, file_t*, pointer);
+    GtkImage* current = file->image;
+    gtk_image_set_from_pixbuf(current, file->pixbuf);
     return 0;
 }
 
@@ -269,14 +281,14 @@ static int luaI_get_preivew(lua_State *L)
 static int luaI_toggle_preview(lua_State *L)
 {
     preview = !preview;
-    gtk_container_foreach(GTK_CONTAINER(swindow), clear_swindow, NULL);
+    clear_swindow();
     if (preview)
     {
         gtk_container_add(GTK_CONTAINER(swindow), grid);
     }
     else
     {
-        load_image();
+        show_image();
     }
     return 0;
 }
@@ -289,6 +301,8 @@ void luaH_init_functions(void)
     lua_setglobal(L, "quit");
     lua_pushcfunction(L, luaI_rotate);
     lua_setglobal(L, "rotate");
+    lua_pushcfunction(L, luaI_reset);
+    lua_setglobal(L, "reset");
     lua_pushcfunction(L, luaI_slide);
     lua_setglobal(L, "slide");
     lua_pushcfunction(L, luaI_toggle_preview);
@@ -418,7 +432,7 @@ gint main(gint argc, gchar **argv)
     g_object_ref(grid);
 
     pointer = 0;
-    files = g_array_new(TRUE, FALSE, sizeof(image_t*));
+    files = g_array_new(TRUE, FALSE, sizeof(file_t*));
 
     read_files();
     fill_grid();

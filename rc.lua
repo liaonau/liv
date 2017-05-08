@@ -64,6 +64,9 @@ keys =
         Down  = call_prefixed(function(n) slide(true,  n) end,  preview_slide_step),
     },
 
+    s = function()
+        reset()
+    end,
     Return = function(a, b, c)
         toggle_preview()
     end,
