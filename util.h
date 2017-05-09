@@ -1,6 +1,5 @@
 #pragma once
 #include "conf.h"
-#include "conf.h"
 
 /* ANSI term color codes */
 #define ANSI_COLOR_RESET   "\x1b[0m"

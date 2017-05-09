@@ -1,39 +1,44 @@
 #pragma once
 
 #include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
 
 #include <glib.h>
 #include <gtk/gtk.h>
 
 #define APPNAME "liv"
 
-typedef GdkPoint point;
+#define UDATA_FILEL  "fileL"
+#define UDATA_IMAGEL "imageL"
+#define UDATA_GRIDL  "gridL"
 
-typedef struct
+#define LIB_FILEL  "file"
+#define LIB_IMAGEL "image"
+#define LIB_GRIDL  "grid"
+
+typedef struct gridL
 {
-    gchar*     filename;
-    GtkImage*  thumb;
+    GtkGrid* grid;
+}
+gridL;
+
+typedef struct imageL
+{
     GtkImage*  image;
     GdkPixbuf* pixbuf;
-    point      size;
-    gboolean   marked;
-    guint      index;
 }
-file_t;
+imageL;
 
-typedef struct
+typedef struct fileL
 {
-    gint  max_thumb_size;
-    point window_size;
+    gchar*     path;
+    GdkPixbuf* pixbuf;
 }
-conf_t;
-
-conf_t conf;
-
-gint pointer;
-GArray* files;
-
-gchar** infiles;
-gchar*  execpath;
+fileL;
 
 lua_State* L;
+
+GtkWindow* window;
+GtkWidget* swindow;
+
