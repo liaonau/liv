@@ -35,6 +35,7 @@ gboolean luaH_loadrc(gchar* confpath)
     GPtrArray          *ptr_paths   = g_ptr_array_new();
     if (confpath != NULL)
         g_ptr_array_add(ptr_paths, confpath);
+    g_ptr_array_add(ptr_paths, "./rc.lua");
     g_ptr_array_add(ptr_paths, g_build_filename(g_get_user_config_dir(), APPNAME, "/rc.lua", NULL));
     for(; *config_dirs; config_dirs++)
         g_ptr_array_add(ptr_paths, g_build_filename(*config_dirs, APPNAME, "/rc.lua", NULL));
