@@ -102,7 +102,6 @@ static int gc_imageL(lua_State *L)
     imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
     g_object_unref(i->image);
     g_object_unref(i->pixbuf);
-    warn("image: collecting garbage");
     return 0;
 }
 

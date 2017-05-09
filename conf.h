@@ -12,10 +12,17 @@
 #define UDATA_FILEL  "fileL"
 #define UDATA_IMAGEL "imageL"
 #define UDATA_GRIDL  "gridL"
+#define UDATA_APPL   "appL"
 
 #define LIB_FILEL  "file"
 #define LIB_IMAGEL "image"
 #define LIB_GRIDL  "grid"
+#define LIB_APPL   "app"
+
+typedef struct appL
+{
+}
+appL;
 
 typedef struct gridL
 {

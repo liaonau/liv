@@ -11,7 +11,8 @@
 #define ANSI_COLOR_MAGENTA "\x1b[35m"
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 
-#define ANSI_COLOR_BG_RED  "\x1b[41m"
+#define ANSI_COLOR_BG_RED    "\x1b[41m"
+#define ANSI_COLOR_BG_YELLOW "\x1b[43m"
 
 typedef struct
 {
@@ -26,5 +27,8 @@ void _fatal(gint, const gchar *, const gchar *, ...);
 
 #define warn(string, ...) _warn(__LINE__, __func__, string, ##__VA_ARGS__)
 void _warn(gint, const gchar *, const gchar *, ...);
+
+#define info(string, ...) _info(__LINE__, __func__, string, ##__VA_ARGS__)
+void _info(gint, const gchar *, const gchar *, ...);
 
 keypress_t* keyval_to_keypress(GdkEventKey*);

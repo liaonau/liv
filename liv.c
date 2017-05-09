@@ -4,6 +4,7 @@
 #include "fileL.h"
 #include "imageL.h"
 #include "gridL.h"
+#include "appL.h"
 
 #include <math.h>
 #include <string.h>
@@ -24,6 +25,7 @@ gboolean luaH_init(void)
     luaopen_fileL(L, LIB_FILEL);
     luaopen_imageL(L, LIB_IMAGEL);
     luaopen_gridL(L, LIB_GRIDL);
+    luaopen_appL(L, LIB_APPL);
     return TRUE;
 }
 
@@ -47,6 +49,31 @@ gboolean luaH_loadrc(gchar* confpath)
             warn("«%s» doesn't exist", p[i]);
     }
     return FALSE;
+}
+
+static int luaH_traceback(lua_State *L)
+{
+    lua_getglobal(L, "debug");
+    lua_getfield(L, -1, "traceback");
+    lua_replace(L, -2);
+    lua_pushvalue(L, 1);
+    lua_pushinteger(L, 2);
+    lua_call(L, 2, 1);
+    return 1;
+}
+
+void luaH_pcall(lua_State *L, int nargs, int nresults)
+{
+    lua_pushcfunction(L, luaH_traceback);
+    lua_insert(L, - nargs - 2);
+    int error_func_pos = lua_gettop(L) - nargs - 1;
+    if (lua_pcall(L, nargs, nresults, -nargs - 2))
+    {
+        warn("%s", lua_tostring(L, -1));
+        lua_pop(L, 2);
+        return;
+    }
+    lua_remove(L, error_func_pos);
 }
 
 gint main(gint argc, gchar **argv)
@@ -87,7 +114,10 @@ gint main(gint argc, gchar **argv)
     lua_getglobal(L, "init");
     for (gint i = 1; i < argc; i++)
         lua_pushstring(L, argv[i]);
-    lua_pcall(L, argc - 1, 0, 0);
+    luaH_pcall(L, argc - 1, 0);
+
+    lua_getglobal(L, "callme");
+    luaH_pcall(L, 0, 0);
 
     /*g_signal_connect(window, "size-allocate",   G_CALLBACK(cb_size),       NULL);*/
     /*g_signal_connect(window, "key-press-event", G_CALLBACK(cb_key),        NULL);*/
