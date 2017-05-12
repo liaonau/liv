@@ -48,36 +48,3 @@ void _info(gint line, const gchar *fct, const gchar *fmt, ...)
     g_fprintf(stderr, "\n");
 }
 
-keypress_t* keyval_to_keypress(GdkEventKey* ev)
-{
-    guint transformed_keyval = ev->keyval;
-    gdk_keymap_translate_keyboard_state(
-            gdk_keymap_get_default(),
-            ev->hardware_keycode,
-            ev->state,
-            0, /* default group */
-            &transformed_keyval, NULL, NULL, NULL);
-    gchar ucs[32];
-    guint ulen;
-    guint32 ukval = gdk_keyval_to_unicode(transformed_keyval);
-    if (g_unichar_isgraph(ukval))
-    {
-        ulen = g_unichar_to_utf8(ukval, ucs);
-        ucs[ulen] = 0;
-    }
-    else
-    {
-        gchar *p = gdk_keyval_name(transformed_keyval);
-        guint len = strlen(p);
-        for (gint i = 0; *p; p++, i++)
-            ucs[i] = *p;
-        ucs[len] = 0;
-    }
-
-    keypress_t* keypress = g_malloc(sizeof(keypress_t));
-    keypress->transformed_keyval = transformed_keyval;
-    strcpy(keypress->keyname, ucs);
-    keypress->keyval = ev->keyval;
-    return keypress;
-}
-

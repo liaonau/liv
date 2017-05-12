@@ -9,12 +9,10 @@
 
 #define APPNAME "liv"
 
-#define UDATA_FILEL  "fileL"
-#define UDATA_IMAGEL "imageL"
-#define UDATA_GRIDL  "gridL"
-#define UDATA_APPL   "appL"
+#define UDATA_IMAGEL "«image»"
+#define UDATA_GRIDL  "«grid»"
+#define UDATA_APPL   "«app»"
 
-#define LIB_FILEL  "file"
 #define LIB_IMAGEL "image"
 #define LIB_GRIDL  "grid"
 #define LIB_APPL   "app"
@@ -32,20 +30,16 @@ gridL;
 
 typedef struct imageL
 {
-    GtkImage*  image;
-    GdkPixbuf* pixbuf;
+    const gchar* path;
+    gboolean     broken;
+    GdkPixbuf*   originalpxb;
+    GtkImage*    image;
+    guint8       state;
 }
 imageL;
-
-typedef struct fileL
-{
-    gchar*     path;
-    GdkPixbuf* pixbuf;
-}
-fileL;
 
 lua_State* L;
 
 GtkWindow* window;
-GtkWidget* swindow;
+GtkWidget* scroll;
 
