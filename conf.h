@@ -33,7 +33,7 @@ typedef struct imageL
     const gchar* path;
     gboolean     broken;
     GdkPixbuf*   originalpxb;
-    gboolean     marked;
+    GtkFrame*    frame;
     GtkImage*    image;
     guint8       state;
 }

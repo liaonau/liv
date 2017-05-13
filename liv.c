@@ -181,9 +181,11 @@ gint main(gint argc, gchar **argv)
 
     window = (GtkWindow*)gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), APPNAME);
+    gtk_widget_set_name((GtkWidget*)window, "window");
 
     scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_container_add(GTK_CONTAINER(window), scroll);
+    gtk_widget_set_name((GtkWidget*)scroll, "scroll");
 
     if (!luaH_init())
         fatal("can't init Lua");

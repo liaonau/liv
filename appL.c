@@ -23,6 +23,23 @@ static int resize_appL(lua_State *L)
     return 0;
 }
 
+static int style_appL(lua_State *L)
+{
+    luaL_checkudata(L, 1, UDATA_APPL);
+    size_t size = 0;
+    const gchar* data = luaL_checklstring(L, 2, &size);
+    if (size == 0)
+        return 0;
+    guint priority = lua_toboolean(L, 3) ? GTK_STYLE_PROVIDER_PRIORITY_FALLBACK : GTK_STYLE_PROVIDER_PRIORITY_USER;
+    GtkCssProvider* provider = gtk_css_provider_new();
+    if (!gtk_css_provider_load_from_data(provider, data, size, NULL))
+        return 0;
+    GdkDisplay* display = gdk_display_get_default();
+    GdkScreen*  screen  = gdk_display_get_default_screen(display);
+    gtk_style_context_add_provider_for_screen(screen, GTK_STYLE_PROVIDER(provider), priority);
+    return 0;
+}
+
 static int index_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -59,6 +76,8 @@ static int index_appL(lua_State *L)
         lua_pushcfunction(L, resize_appL);
     else if (g_strcmp0(field, "quit") == 0)
         lua_pushcfunction(L, quit_appL);
+    else if (g_strcmp0(field, "style") == 0)
+        lua_pushcfunction(L, style_appL);
     else
         lua_pushnil(L);
     return 1;

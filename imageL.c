@@ -1,14 +1,13 @@
 #include "luaL.h"
 #include "util.h"
 #include "imageL.h"
-#include "graph.h"
 #include "resource.h"
 
 static const GdkPixbuf* comppbx;
 static const GdkPixbuf* brokenpbx;
 
 //таблица умножения группы четырех вращений и вертикального и горизонтального отражения
-//a0-a3 — вращения, a4,a6 — горизонтальные и вертикальные отражения, a5 — транспонирование
+//a0-a3 — вращения, a4,a6 — горизонтальные и вертикальные отражения
 static const guint8 states[8][8] =
 {
     {0, 1, 2, 3, 4, 5, 6, 7},
@@ -68,14 +67,14 @@ static GdkPixbuf* new_pixbuf_by_state(guint8* state, GdkPixbuf* original)
     case 4:
         tmppxb = gdk_pixbuf_flip(tmppxb, TRUE);
         break;
-    case 5: //транспонирование a1*a6=a5
+    case 5:
         tmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_CLOCKWISE);
         tmppxb = gdk_pixbuf_flip(tmppxb, TRUE);
         break;
     case 6:
         tmppxb = gdk_pixbuf_flip(tmppxb, FALSE);
         break;
-    case 7: //a3*a6=a7
+    case 7:
         tmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
         tmppxb = gdk_pixbuf_flip(tmppxb, TRUE);
         break;
@@ -104,40 +103,16 @@ static int new_imageL(lua_State *L)
     g_object_ref(pixbuf);
     i->image  = (GtkImage*)gtk_image_new_from_pixbuf(pixbuf);
     g_object_ref(i->image);
-    i->marked = FALSE;
+    i->frame = (GtkFrame*)gtk_frame_new(NULL);
+    g_object_ref(i->frame);
+    /*gtk_frame_set_label_align(i->frame, 0.5, 1.0);*/
+    gtk_container_add(GTK_CONTAINER(i->frame), (GtkWidget*)i->image);
 
     reset_state(&i->state);
 
     luaL_getmetatable(L, UDATA_IMAGEL);
     lua_setmetatable(L, -2);
     return 1;
-}
-
-static int toggle_mark_imageL(lua_State *L)
-{
-    imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
-    GdkPixbuf* buf  = gtk_image_get_pixbuf(i->image);
-    int dest_width  = gdk_pixbuf_get_width(buf);
-    int dest_height = gdk_pixbuf_get_height(buf);
-    i->realpxb = gdk_pixbuf_copy(buf);
-    gdk_pixbuf_copy_options(i->realpxb, buf);
-    g_object_ref(i->realpxb);
-    gdk_pixbuf_composite(
-            gdk_pixbuf_scale_simple(comppbx, dest_width, dest_height, GDK_INTERP_BILINEAR),
-            buf,
-            0, //int dest_x,
-            0, //int dest_y,
-            dest_width,
-            dest_height,
-            0, //double offset_x,
-            0, //double offset_y,
-            1, //double scale_x,
-            1, //double scale_y,
-            GDK_INTERP_BILINEAR, //GdkInterpType interp_type,
-            255 //int overall_alpha
-            );
-    gtk_image_set_from_pixbuf(i->image, buf);
-    return 0;
 }
 
 static int rotate_imageL(lua_State *L)
@@ -237,14 +212,39 @@ static int index_imageL(lua_State *L)
         lua_pushnumber(L, gdk_pixbuf_get_width(i->originalpxb));
     else if (g_strcmp0(field, "native_height") == 0)
         lua_pushnumber(L, gdk_pixbuf_get_height(i->originalpxb));
+    else if (g_strcmp0(field, "allocation") == 0)
+    {
+        lua_newtable(L);
+        GtkAllocation alloc;
+        GtkRequisition minimum_size;
+        GtkRequisition natural_size;
+        gtk_widget_get_allocation((GtkWidget*)i->frame, &alloc);
+        gtk_widget_get_preferred_size((GtkWidget*)i->frame, &minimum_size, &natural_size);
+        lua_pushnumber(L, alloc.width);
+        lua_setfield(L, -2, "width");
+        lua_pushnumber(L, alloc.height);
+        lua_setfield(L, -2, "height");
+        lua_pushnumber(L, minimum_size.width);
+        lua_setfield(L, -2, "minimum_width");
+        lua_pushnumber(L, minimum_size.height);
+        lua_setfield(L, -2, "minimum_height");
+        lua_pushnumber(L, natural_size.width);
+        lua_setfield(L, -2, "natural_width");
+        lua_pushnumber(L, natural_size.height);
+        lua_setfield(L, -2, "natural_height");
+        /*lua_pushnumber(L, gtk_container_get_border_width(GTK_CONTAINER(i->frame)));*/
+        /*lua_setfield(L, -2, "border");*/
+    }
     else if (g_strcmp0(field, "state") == 0)
         lua_pushnumber(L, i->state);
     else if (g_strcmp0(field, "swapped") == 0)
         lua_pushboolean(L, swapped_state(&i->state));
     else if (g_strcmp0(field, "broken") == 0)
         lua_pushboolean(L, i->broken);
-    else if (g_strcmp0(field, "marked") == 0)
-        lua_pushboolean(L, i->marked);
+    else if (g_strcmp0(field, "name") == 0)
+        lua_pushstring(L, gtk_widget_get_name((GtkWidget*)i->frame));
+    else if (g_strcmp0(field, "label") == 0)
+        lua_pushstring(L, gtk_frame_get_label(i->frame));
     else if (g_strcmp0(field, "rotate") == 0)
         lua_pushcfunction(L, rotate_imageL);
     else if (g_strcmp0(field, "flip") == 0)
@@ -253,10 +253,6 @@ static int index_imageL(lua_State *L)
         lua_pushcfunction(L, scale_imageL);
     else if (g_strcmp0(field, "reset") == 0)
         lua_pushcfunction(L, reset_imageL);
-    else if (g_strcmp0(field, "mark") == 0)
-        lua_pushcfunction(L, mark_imageL);
-    else if (g_strcmp0(field, "unmark") == 0)
-        lua_pushcfunction(L, unmark_imageL);
     else
         lua_pushnil(L);
     return 1;
@@ -276,6 +272,13 @@ static int newindex_imageL(lua_State *L)
         gint h = luaL_checknumber(L, 3);
         scale(i, gdk_pixbuf_get_width(gtk_image_get_pixbuf(i->image)), h);
     }
+    else if (g_strcmp0(field, "name") == 0)
+    {
+        const gchar* name = luaL_checkstring(L, 3);
+        gtk_widget_set_name((GtkWidget *)i->frame, name);
+    }
+    else if (g_strcmp0(field, "label") == 0)
+        gtk_frame_set_label(i->frame, lua_tostring(L, 3));
     return 0;
 }
 

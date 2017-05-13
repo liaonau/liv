@@ -1,0 +1,27 @@
+#thumb
+{
+    /*box-shadow:  0px 0px 5px black;*/
+    border:       4px solid white;
+    border-color: #aaaaaa;
+}
+#current_thumb
+{
+    box-shadow:  0px 0px 5px black;
+    border:      4px dotted black;
+    border-color: #ff0000;
+}
+#marked_thumb
+{
+    /*box-shadow:  0px 0px 5px black;*/
+    border:      4px solid yellow;
+    border-color: #ffff00;
+}
+#current_marked_thumb
+{
+    box-shadow:  0px 0px 5px black;
+    border:      4px dotted red;
+    border-color: #ff00ff;
+}
+#window
+{
+}
