@@ -73,19 +73,22 @@ change_image = function(shift) --{{{
     if (max == 0) then
         return
     end
+    local old = state.idx
     local idx
     if (   shift == "first") then
         idx = 1
     elseif (shift == "last") then
         idx = #images
     else
-        idx = state.idx + shift
+        idx = old + shift
     end
     idx = (idx > max) and max or idx
     idx = (idx < 1  ) and 1   or idx
     grid.replace(frame, images[idx])
     current = images[idx]
     state.idx = idx
+    thumbs[old]:unmark()
+    thumbs[idx]:mark()
 end
 --}}}
 
@@ -263,23 +266,21 @@ hotkeys = --{{{
     {
         {{         }, "i", function() print(current) end},
 
+        {{         }, "j", function() change_image( 1)      end},
+        {{         }, "k", function() change_image(-1)      end},
+        {{         }, "g", function() change_image("first") end},
+        {{"Shift"  }, "g", function() change_image("last")  end},
+
         {{         }, "q", function() app:quit()       end},
         {{         }, "t", function() toggle_preview() end},
     },
     --}}}
     frame = --{{{
     {
-        {{         }, "c", function() current:composite() end},
-
         {{         }, "Left",  function() scroll_frame(true,  -10) end},
         {{         }, "Right", function() scroll_frame(true,   10) end},
         {{         }, "Down",  function() scroll_frame(false,  10) end},
         {{         }, "Up",    function() scroll_frame(false, -10) end},
-
-        {{         }, "j", function() change_image( 1)      end},
-        {{         }, "k", function() change_image(-1)      end},
-        {{         }, "g", function() change_image("first") end},
-        {{"Shift"  }, "g", function() change_image("last")  end},
 
         {{         }, "s",     function() resizer.to_native(current)           end},
         {{         }, "w",     function() resizer.to_window_if_larger(current) end},

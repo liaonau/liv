@@ -83,30 +83,6 @@ static GdkPixbuf* new_pixbuf_by_state(guint8* state, GdkPixbuf* original)
     return tmppxb;
 }
 
-static int composite_imageL(lua_State *L)
-{
-    imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
-    GdkPixbuf* buf  = gtk_image_get_pixbuf(i->image);
-    int dest_width  = gdk_pixbuf_get_width(buf);
-    int dest_height = gdk_pixbuf_get_height(buf);
-    info("here");
-    gdk_pixbuf_composite(
-            comppbx,
-            buf,
-            0, //int dest_x,
-            0, //int dest_y,
-            dest_width,
-            dest_height,
-            0, //double offset_x,
-            0, //double offset_y,
-            1, //double scale_x,
-            1, //double scale_y,
-            GDK_INTERP_NEAREST, //GdkInterpType interp_type,
-            255 //int overall_alpha
-            );
-    return 0;
-}
-
 
 static int new_imageL(lua_State *L)
 {
@@ -128,6 +104,7 @@ static int new_imageL(lua_State *L)
     g_object_ref(pixbuf);
     i->image  = (GtkImage*)gtk_image_new_from_pixbuf(pixbuf);
     g_object_ref(i->image);
+    i->marked = FALSE;
 
     reset_state(&i->state);
 
@@ -136,24 +113,31 @@ static int new_imageL(lua_State *L)
     return 1;
 }
 
-static int copy_imageL(lua_State *L)
+static int toggle_mark_imageL(lua_State *L)
 {
-    imageL *src = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
-    imageL* dst = (imageL*)lua_newuserdata(L, sizeof(imageL));
-
-    dst->originalpxb = src->originalpxb;
-    g_object_ref(dst->originalpxb);
-    dst->path = g_strdup(src->path);
-    dst->broken = src->broken;
-
-    dst->image = (GtkImage*)gtk_image_new_from_pixbuf(gtk_image_get_pixbuf(src->image));
-    g_object_ref(dst->image);
-
-    dst->state = src->state;
-
-    luaL_getmetatable(L, UDATA_IMAGEL);
-    lua_setmetatable(L, -2);
-    return 1;
+    imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    GdkPixbuf* buf  = gtk_image_get_pixbuf(i->image);
+    int dest_width  = gdk_pixbuf_get_width(buf);
+    int dest_height = gdk_pixbuf_get_height(buf);
+    i->realpxb = gdk_pixbuf_copy(buf);
+    gdk_pixbuf_copy_options(i->realpxb, buf);
+    g_object_ref(i->realpxb);
+    gdk_pixbuf_composite(
+            gdk_pixbuf_scale_simple(comppbx, dest_width, dest_height, GDK_INTERP_BILINEAR),
+            buf,
+            0, //int dest_x,
+            0, //int dest_y,
+            dest_width,
+            dest_height,
+            0, //double offset_x,
+            0, //double offset_y,
+            1, //double scale_x,
+            1, //double scale_y,
+            GDK_INTERP_BILINEAR, //GdkInterpType interp_type,
+            255 //int overall_alpha
+            );
+    gtk_image_set_from_pixbuf(i->image, buf);
+    return 0;
 }
 
 static int rotate_imageL(lua_State *L)
@@ -259,6 +243,8 @@ static int index_imageL(lua_State *L)
         lua_pushboolean(L, swapped_state(&i->state));
     else if (g_strcmp0(field, "broken") == 0)
         lua_pushboolean(L, i->broken);
+    else if (g_strcmp0(field, "marked") == 0)
+        lua_pushboolean(L, i->marked);
     else if (g_strcmp0(field, "rotate") == 0)
         lua_pushcfunction(L, rotate_imageL);
     else if (g_strcmp0(field, "flip") == 0)
@@ -267,10 +253,10 @@ static int index_imageL(lua_State *L)
         lua_pushcfunction(L, scale_imageL);
     else if (g_strcmp0(field, "reset") == 0)
         lua_pushcfunction(L, reset_imageL);
-    else if (g_strcmp0(field, "copy") == 0)
-        lua_pushcfunction(L, copy_imageL);
-    else if (g_strcmp0(field, "composite") == 0)
-        lua_pushcfunction(L, composite_imageL);
+    else if (g_strcmp0(field, "mark") == 0)
+        lua_pushcfunction(L, mark_imageL);
+    else if (g_strcmp0(field, "unmark") == 0)
+        lua_pushcfunction(L, unmark_imageL);
     else
         lua_pushnil(L);
     return 1;
