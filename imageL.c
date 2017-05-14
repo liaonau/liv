@@ -49,34 +49,67 @@ static void adjust_state_flipped(guint8* state, gboolean horizontal)
 
 static GdkPixbuf* new_pixbuf_by_state(guint8* state, GdkPixbuf* original)
 {
-    GdkPixbuf* tmppxb = gdk_pixbuf_copy(original);
-    gdk_pixbuf_copy_options(original, tmppxb);
+    GdkPixbuf* tmppxb = NULL;
+    GdkPixbuf* newtmppxb;
+
     switch (*state)
     {
     case 0: //нейтральный элемент группы
         break;
     case 1:
-        tmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_CLOCKWISE);
+        tmppxb = gdk_pixbuf_copy(original);
+        gdk_pixbuf_copy_options(original, tmppxb);
+        newtmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_CLOCKWISE);
+        g_object_unref(tmppxb);
+        tmppxb = newtmppxb;
         break;
     case 2:
-        tmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_UPSIDEDOWN);
+        tmppxb = gdk_pixbuf_copy(original);
+        gdk_pixbuf_copy_options(original, tmppxb);
+        newtmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_UPSIDEDOWN);
+        g_object_unref(tmppxb);
+        tmppxb = newtmppxb;
         break;
     case 3:
-        tmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
+        tmppxb = gdk_pixbuf_copy(original);
+        gdk_pixbuf_copy_options(original, tmppxb);
+        newtmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
+        g_object_unref(tmppxb);
+        tmppxb = newtmppxb;
         break;
     case 4:
-        tmppxb = gdk_pixbuf_flip(tmppxb, TRUE);
+        tmppxb = gdk_pixbuf_copy(original);
+        gdk_pixbuf_copy_options(original, tmppxb);
+        newtmppxb = gdk_pixbuf_flip(tmppxb, TRUE);
+        g_object_unref(tmppxb);
+        tmppxb = newtmppxb;
         break;
     case 5:
-        tmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_CLOCKWISE);
-        tmppxb = gdk_pixbuf_flip(tmppxb, TRUE);
+        tmppxb = gdk_pixbuf_copy(original);
+        gdk_pixbuf_copy_options(original, tmppxb);
+        newtmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_CLOCKWISE);
+        g_object_unref(tmppxb);
+        tmppxb = newtmppxb;
+        newtmppxb = gdk_pixbuf_flip(tmppxb, TRUE);
+        g_object_unref(tmppxb);
+        tmppxb = newtmppxb;
         break;
     case 6:
-        tmppxb = gdk_pixbuf_flip(tmppxb, FALSE);
+        tmppxb = gdk_pixbuf_copy(original);
+        gdk_pixbuf_copy_options(original, tmppxb);
+        newtmppxb = gdk_pixbuf_flip(tmppxb, FALSE);
+        g_object_unref(tmppxb);
+        tmppxb = newtmppxb;
         break;
     case 7:
-        tmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
-        tmppxb = gdk_pixbuf_flip(tmppxb, TRUE);
+        tmppxb = gdk_pixbuf_copy(original);
+        gdk_pixbuf_copy_options(original, tmppxb);
+        newtmppxb = gdk_pixbuf_rotate_simple(tmppxb, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
+        g_object_unref(tmppxb);
+        tmppxb = newtmppxb;
+        newtmppxb = gdk_pixbuf_flip(tmppxb, TRUE);
+        g_object_unref(tmppxb);
+        tmppxb = newtmppxb;
         break;
     }
     return tmppxb;
@@ -127,7 +160,9 @@ static int rotate_imageL(lua_State *L)
 
     if (GDK_IS_PIXBUF(pixbuf))
     {
-        gtk_image_set_from_pixbuf(i->image, gdk_pixbuf_rotate_simple(pixbuf, rotation));
+        GdkPixbuf* tmppxb = gdk_pixbuf_rotate_simple(pixbuf, rotation);
+        gtk_image_set_from_pixbuf(i->image, tmppxb);
+        g_object_unref(tmppxb);
         adjust_state_rotation(&i->state, clockwise);
     }
     return 0;
@@ -146,6 +181,7 @@ static int flip_imageL(lua_State *L)
         {
             gtk_image_set_from_pixbuf(i->image, new_pixbuf);
             adjust_state_flipped(&i->state, horizontal);
+            g_object_unref(new_pixbuf);
         }
     }
     return 0;
@@ -161,8 +197,16 @@ static void scale(imageL* i, gint width, gint height)
     if (w != width || h != height)
     {
         GdkPixbuf* pixbuf = new_pixbuf_by_state(&i->state, i->originalpxb);
-        pixbuf = gdk_pixbuf_scale_simple(pixbuf, width, height, GDK_INTERP_BILINEAR);
-        gtk_image_set_from_pixbuf(i->image, pixbuf);
+        GdkPixbuf* scaledpxb;
+        if (!GDK_IS_PIXBUF(pixbuf))
+            scaledpxb = gdk_pixbuf_scale_simple(i->originalpxb, width, height, GDK_INTERP_BILINEAR);
+        else
+        {
+            scaledpxb = gdk_pixbuf_scale_simple(pixbuf, width, height, GDK_INTERP_BILINEAR);
+            g_object_unref(pixbuf);
+        }
+        gtk_image_set_from_pixbuf(i->image, scaledpxb);
+        g_object_unref(scaledpxb);
     }
 }
 

@@ -45,5 +45,6 @@ GtkWindow* window;
 GtkWidget* scroll;
 GtkLabel*  status_left;
 GtkLabel*  status_right;
+GtkBox*    mainbox;
 GtkBox*    statusbox;
 

@@ -217,7 +217,7 @@ gint main(gint argc, gchar **argv)
     gtk_window_set_title(GTK_WINDOW(window), APPNAME);
     gtk_widget_set_name((GtkWidget*)window, "window");
 
-    GtkBox* mainbox = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    mainbox   = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
     statusbox = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
     scroll = gtk_scrolled_window_new(NULL, NULL);

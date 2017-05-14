@@ -40,6 +40,7 @@ static int style_appL(lua_State *L)
     return 0;
 }
 
+static const int IDontKnowWhyGtkAdds2Pixels = 2;
 static int index_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -52,13 +53,13 @@ static int index_appL(lua_State *L)
     {
         GtkAllocation alloc;
         gtk_widget_get_allocation((GtkWidget*)scroll, &alloc);
-        lua_pushnumber(L, alloc.width);
+        lua_pushnumber(L, alloc.width - IDontKnowWhyGtkAdds2Pixels);
     }
     else if (g_strcmp0(field, "height") == 0)
     {
         GtkAllocation alloc;
         gtk_widget_get_allocation((GtkWidget*)scroll, &alloc);
-        lua_pushnumber(L, alloc.height);
+        lua_pushnumber(L, alloc.height - IDontKnowWhyGtkAdds2Pixels);
     }
     else if (g_strcmp0(field, "hscroll") == 0)
     {

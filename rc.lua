@@ -12,6 +12,7 @@ thumbs.size = 128
 thumbs.step = 16
 images.scroll_step = 10
 images.zoom_step   = 20
+images.zoom_mul    = 1.2
 default_constraints = {min = 32, max = 2000}
 
 
@@ -45,27 +46,27 @@ local css =
 [===[
 #thumb
 {
-    /*box-shadow:  0px 0px 5px black;*/
-    border:       4px solid white;
-    border-color: #aaaaaa;
-}
-#current_thumb
-{
-    box-shadow:  0px 0px 5px black;
-    border:      4px dotted black;
-    border-color: #ff0000;
+    border:        0px solid;
+    border-color:  #aaaaaa;
 }
 #marked_thumb
 {
-    /*box-shadow:  0px 0px 5px black;*/
-    border:      4px solid yellow;
-    border-color: #ffff00;
+    border:        4px solid;
+    border-color:  #ffff00;
+}
+#current_thumb
+{
+    box-shadow:    0px 0px 5px;
+    border:        5px solid;
+    border-radius: 10px;
+    border-color:  #ff0000;
 }
 #current_marked_thumb
 {
-    box-shadow:  0px 0px 5px black;
-    border:      4px dotted red;
-    border-color: #ff00ff;
+    box-shadow:    0px 0px 5px;
+    border:        5px solid;
+    border-radius: 10px;
+    border-color:  #ff00ff;
 }
 #window
 {
@@ -245,10 +246,6 @@ direction = function(l, t)--{{{
     viewer.set(i)
 end,
 --}}}
-up    = function() navigator.direction( 0, -1) end,
-down  = function() navigator.direction( 0,  1) end,
-left  = function() navigator.direction(-1,  0) end,
-right = function() navigator.direction( 1,  0) end,
 }
 --}}}}}}
 --{{{{{{ viewer: просмотр
@@ -274,7 +271,7 @@ set_labels = function(st)--{{{
         end
         t.label = l
     end
-    viewer.fill_preview()
+    --viewer.fill_preview()
 end,
 --}}}
 set = function(idx) --{{{
@@ -508,24 +505,6 @@ end,
 --{{{{{{ resizer: масштабирование
 resizer =
 {
-zoom = function(i, p, min, max) --{{{
-    min = min and min or default_constraints.min
-    max = max and max or default_constraints.max
-    local w, h = dims.size(i)
-    local a = w / h
-    local s = (100 + p) / 100
-    w, h = w * s, h * s
-    if ((w / h) ~= a) then
-        if (w > h) then h = w / a else w = h * a end
-    end
-    if (w < min or h < min) then
-        if (w <= h) then w, h = min, min / a else w, h = min * a, min end
-    elseif (w > max or h > max) then
-        if (w >= h) then w, h = max, max / a else w, h = max * a, max end
-    end
-    i:scale(w, h)
-end,
---}}}
 thumbs = function(s) --{{{
     s = math.min(thumbs.max, s)
     s = math.max(thumbs.min, s)
@@ -540,10 +519,48 @@ thumbs = function(s) --{{{
     viewer.fill_preview()
 end,
 --}}}
+zoom = function(i, s) --{{{
+    local min, max = dims.real_constraints(i)
+    local w, h = dims.size(i)
+    local W, H = dims.native_size(i)
+    local a = w / h
+    w, h = w * s, h * s
+    if ((w / h) ~= a) then
+        if (w > h) then h = w / a else w = h * a end
+    end
+    if (w < min or h < min) then
+        if (w <= h) then w, h = min, min / a else w, h = min * a, min end
+    elseif (w > max or h > max) then
+        if (w >= h) then w, h = max, max / a else w, h = max * a, max end
+    end
+    i:scale(w, h)
+end,
+--}}}
+zoom_add = function(i, p) --{{{
+    local w, h = dims.size(i)
+    local W, H = dims.native_size(i)
+    local dist = math.max(w / W, h / H)
+    local s = 1 + p / (100*dist)
+    resizer.zoom(i, s)
+end,
+--}}}
 if_larger = function(i, w, h)--{{{
     if (not dims.native_fits(i, w, h)) then
         i:scale(w, h)
     end
+end,
+--}}}
+to_native_aspect = function(i)--{{{
+    local W, H = dims.native_size(i)
+    local na = W / H
+    local w, h = dims.size(i)
+    local a = w / h
+    if (a > na) then
+        w = h * na
+    else
+        h = w / na
+    end
+    i:scale(w, h)
 end,
 --}}}
 to_native = function(i)--{{{
@@ -640,6 +657,14 @@ end,
 }
 ---}}}}}}
 test = function()
+    --preview:clear()
+    --frame:clear()
+    --thumbs = nil
+    --images = nil
+    --files = nil
+    --preview = nil
+    --frame = nil
+    collectgarbage()
 end
 --{{{{{{ steward: горячие клавиши
 steward =
@@ -719,6 +744,9 @@ hotkeys =
 {
     any = --{{{
     {
+        {{"Control"}, "i", function() viewer.fill_preview() end},
+        {{         }, "i", test},
+
         {{         }, "m", function() marker.current_toggle() end},
         {{"Shift"  }, "m", function() marker.reverse()        end},
         {{"Control"}, "m", function() marker.reset()          end},
@@ -727,6 +755,9 @@ hotkeys =
         {{"Control"}, "y", function() marker.reset()          end},
 
         {{"Control"}, "r", function() for idx, i in ipairs(images) do i:reset() end end},
+        {{"Control"}, "a", function() for idx, i in ipairs(images) do resizer.in_window_if_larger(i) end end},
+        {{"Control"}, "w", function() for idx, i in ipairs(images) do resizer.to_window_if_larger(i) end end},
+        {{"Control"}, "s", function() for idx, i in ipairs(images) do resizer.to_native(i) end end},
 
         {{         }, "b", function() app.status_visible = not app.status_visible end},
 
@@ -752,23 +783,26 @@ hotkeys =
         {{         }, "k", function() navigator.prev() end},
         {{         }, "l", function() navigator.next() end},
 
-        {{         }, "Left",  prefixed(function(n) scroller.frame_percent(n, 0) end, -images.scroll_step)},
-        {{         }, "Right", prefixed(function(n) scroller.frame_percent(n, 0) end,  images.scroll_step)},
-        {{         }, "Down",  prefixed(function(n) scroller.frame_percent(0, n) end,  images.scroll_step)},
-        {{         }, "Up",    prefixed(function(n) scroller.frame_percent(0, n) end, -images.scroll_step)},
+        {{         }, "Left",  prefixed(function(n) scroller.frame_percent(-n,  0) end, images.scroll_step)},
+        {{         }, "Right", prefixed(function(n) scroller.frame_percent( n,  0) end, images.scroll_step)},
+        {{         }, "Down",  prefixed(function(n) scroller.frame_percent( 0,  n) end, images.scroll_step)},
+        {{         }, "Up",    prefixed(function(n) scroller.frame_percent( 0, -n) end, images.scroll_step)},
         {{"Shift"  }, "c",     function(n) scroller.frame_center() end},
         {{"Shift"  }, "Left",  function(n) scroller.frame(-1,  0) end},
         {{"Shift"  }, "Right", function(n) scroller.frame( 1,  0) end},
         {{"Shift"  }, "Down",  function(n) scroller.frame( 0,  1) end},
         {{"Shift"  }, "Up",    function(n) scroller.frame( 0, -1) end},
 
-        {{         }, "s",     function() resizer.to_native(IMG)           end},
+        {{         }, "s",     function() resizer.to_native_aspect(IMG)    end},
+        {{"Shift"  }, "s",     function() resizer.to_native(IMG)           end},
         {{         }, "w",     function() resizer.to_window_if_larger(IMG) end},
-        {{"Control"}, "w",     function() resizer.to_window(IMG)           end},
-        {{"Control"}, "a",     function() resizer.in_window(IMG)           end},
+        {{"Shift"  }, "w",     function() resizer.to_window(IMG)           end},
         {{         }, "a",     function() resizer.in_window_if_larger(IMG) end},
-        {{         }, "minus", function() resizer.zoom(IMG, -images.zoom_step, dims.real_constraints(IMG)) end},
-        {{         }, "equal", function() resizer.zoom(IMG,  images.zoom_step, dims.real_constraints(IMG)) end},
+        {{"Shift"  }, "a",     function() resizer.in_window(IMG)           end},
+        {{         }, "minus", prefixed(function(n) resizer.zoom(IMG, 1/n) end, images.zoom_mul)},
+        {{         }, "equal", prefixed(function(n) resizer.zoom(IMG,   n) end, images.zoom_mul)},
+        {{"Shift"  }, "minus", prefixed(function(n) resizer.zoom_add(IMG, -n) end, images.zoom_step)},
+        {{"Shift"  }, "equal", prefixed(function(n) resizer.zoom_add(IMG,  n) end, images.zoom_step)},
 
         {{         }, "r",            function() IMG:reset()       end},
         {{         }, "bracketleft",  function() IMG:rotate(false) end},
@@ -779,13 +813,10 @@ hotkeys =
     --}}}
     preview = --{{{
     {
-        --{{"Control"}, "I", function() viewer.fill_preview() end},
-        {{         }, "i", test},
-
-        {{         }, "h", function() navigator.left()  end},
-        {{         }, "j", function() navigator.down()  end},
-        {{         }, "k", function() navigator.up()    end},
-        {{         }, "l", function() navigator.right() end},
+        {{         }, "h", prefixed(function(n) navigator.direction(n, 0) end, -1)},
+        {{         }, "j", prefixed(function(n) navigator.direction(0, n) end,  1)},
+        {{         }, "k", prefixed(function(n) navigator.direction(0, n) end, -1)},
+        {{         }, "l", prefixed(function(n) navigator.direction(n, 0) end,  1)},
 
         {{"Shift"  }, "l", function() viewer.set_labels({index = state.labels.index,     path = not state.labels.path}) end},
         {{"Shift"  }, "n", function() viewer.set_labels({index = not state.labels.index, path = state.labels.path})     end},
@@ -798,8 +829,8 @@ hotkeys =
         {{         }, "Up",    prefixed(function(n) scroller.preview(0, n)  end, -1)},
         {{"Shift"  }, "c",     function() scroller.preview_center_on_current() end},
 
-        {{         }, "minus", prefixed(function(n) resizer.thumbs(thumbs.size + n) end, -thumbs.step)},
-        {{         }, "equal", prefixed(function(n) resizer.thumbs(thumbs.size + n) end,  thumbs.step)},
+        {{         }, "minus", prefixed(function(n) resizer.thumbs(thumbs.size - n) end, thumbs.step)},
+        {{         }, "equal", prefixed(function(n) resizer.thumbs(thumbs.size + n) end, thumbs.step)},
     },
     --}}}
 }
@@ -821,7 +852,7 @@ scroll =--{{{
     other = function()--{{{
         --print('something changed')
         if (state.preview) then
-            scroller.preview_center_on_current()
+            scroller.preview_adjust_to_current()
         else
             --resizer.in_window_if_larger(IMG)
         end
