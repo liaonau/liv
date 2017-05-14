@@ -43,4 +43,7 @@ lua_State* L;
 
 GtkWindow* window;
 GtkWidget* scroll;
+GtkLabel*  status_left;
+GtkLabel*  status_right;
+GtkBox*    statusbox;
 

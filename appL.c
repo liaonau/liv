@@ -50,15 +50,15 @@ static int index_appL(lua_State *L)
         lua_pushstring(L, gtk_window_get_title(window));
     else if (g_strcmp0(field, "width") == 0)
     {
-        gint w, h;
-        gtk_window_get_size(window, &w, &h);
-        lua_pushnumber(L, w);
+        GtkAllocation alloc;
+        gtk_widget_get_allocation((GtkWidget*)scroll, &alloc);
+        lua_pushnumber(L, alloc.width);
     }
     else if (g_strcmp0(field, "height") == 0)
     {
-        gint w, h;
-        gtk_window_get_size(window, &w, &h);
-        lua_pushnumber(L, h);
+        GtkAllocation alloc;
+        gtk_widget_get_allocation((GtkWidget*)scroll, &alloc);
+        lua_pushnumber(L, alloc.height);
     }
     else if (g_strcmp0(field, "hscroll") == 0)
     {
@@ -72,6 +72,27 @@ static int index_appL(lua_State *L)
         gdouble value = gtk_adjustment_get_value(adj);
         lua_pushnumber(L, value);
     }
+    else if (g_strcmp0(field, "max_hscroll") == 0)
+    {
+        GtkAdjustment* adj = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
+        gdouble value = gtk_adjustment_get_upper(adj);
+        lua_pushnumber(L, value);
+    }
+    else if (g_strcmp0(field, "max_vscroll") == 0)
+    {
+        GtkAdjustment* adj = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
+        gdouble value = gtk_adjustment_get_upper(adj);
+        lua_pushnumber(L, value);
+    }
+    else if (g_strcmp0(field, "status_visible") == 0)
+    {
+        gboolean visible = gtk_widget_get_visible((GtkWidget*)statusbox);
+        lua_pushboolean(L, visible);
+    }
+    else if (g_strcmp0(field, "status_left") == 0)
+        lua_pushstring(L, gtk_label_get_text(status_left));
+    else if (g_strcmp0(field, "status_right") == 0)
+        lua_pushstring(L, gtk_label_get_text(status_right));
     else if (g_strcmp0(field, "resize") == 0)
         lua_pushcfunction(L, resize_appL);
     else if (g_strcmp0(field, "quit") == 0)
@@ -92,26 +113,6 @@ static int newindex_appL(lua_State *L)
         const gchar* title = luaL_checkstring(L, 3);
         gtk_window_set_title(window, title);
     }
-    else if (g_strcmp0(field, "width") == 0)
-    {
-        gint w = luaL_checknumber(L, 3);
-        if (w > 0)
-        {
-            gint w_aux, h;
-            gtk_window_get_size(window, &w_aux, &h);
-            gtk_window_resize(window, w, h);
-        }
-    }
-    else if (g_strcmp0(field, "height") == 0)
-    {
-        gint h = luaL_checknumber(L, 3);
-        if (h > 0)
-        {
-            gint w, h_aux;
-            gtk_window_get_size(window, &w, &h_aux);
-            gtk_window_resize(window, w, h);
-        }
-    }
     else if (g_strcmp0(field, "hscroll") == 0)
     {
         gdouble value = luaL_checknumber(L, 3);
@@ -123,6 +124,21 @@ static int newindex_appL(lua_State *L)
         gdouble value = luaL_checknumber(L, 3);
         GtkAdjustment* adj = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
         gtk_adjustment_set_value(adj, value);
+    }
+    else if (g_strcmp0(field, "status_visible") == 0)
+    {
+        gboolean visible = lua_toboolean(L, 3);
+        gtk_widget_set_visible((GtkWidget*)statusbox, visible);
+    }
+    else if (g_strcmp0(field, "status_left") == 0)
+    {
+        const gchar* markup = luaL_checkstring(L, 3);
+        gtk_label_set_markup(status_left, markup);
+    }
+    else if (g_strcmp0(field, "status_right") == 0)
+    {
+        const gchar* markup = luaL_checkstring(L, 3);
+        gtk_label_set_markup(status_right, markup);
     }
     return 0;
 }
@@ -145,8 +161,6 @@ static const struct luaL_Reg appLlib_m [] =
 int luaopen_appL(lua_State *L, const gchar* name)
 {
     lua_newuserdata(L, sizeof(appL));
-    /*gint ref = lua_ref(L, LUA_REGISTRYINDEX);*/
-    /*lua_rawgeti(L, LUA_REGISTRYINDEX, ref);*/
     luaL_newmetatable(L, UDATA_APPL);
     luaL_setfuncs(L, appLlib_m, 0);
     lua_setmetatable(L, -2);

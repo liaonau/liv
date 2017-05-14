@@ -105,7 +105,7 @@ static int new_imageL(lua_State *L)
     g_object_ref(i->image);
     i->frame = (GtkFrame*)gtk_frame_new(NULL);
     g_object_ref(i->frame);
-    /*gtk_frame_set_label_align(i->frame, 0.5, 1.0);*/
+    /*gtk_frame_set_label_align(i->frame, 0.5, 0.5);*/
     gtk_container_add(GTK_CONTAINER(i->frame), (GtkWidget*)i->image);
 
     reset_state(&i->state);

@@ -3,89 +3,125 @@ files   = {}
 images  = {}
 thumbs  = {}
 marks   = {}
-thumbs.min  = 32
-thumbs.max  = 256
-thumbs.size = thumbs.min
 frame   = grid.new('frame')
 preview = grid.new('preview')
+
+thumbs.min  = 16
+thumbs.max  = 256
+thumbs.size = 128
+thumbs.step = 16
+images.scroll_step = 10
+images.zoom_step   = 20
+default_constraints = {min = 32, max = 2000}
+
 
 state =
 {
     preview = true,
     idx     = 1,
     update  = true,
+    labels  = {index = false, path = false},
+    appsize = nil,
+
 }
 
-default_constraints = {min = 1, max = 2000}
+setmetatable(_G,
+{
+    __index = function(t, k)
+        if (k == 'IMG') then
+            return images[state.idx]
+        end
+    end,
+})
 
-current  = nil
---}}}
---{{{{{{ вспомогательные функции
 local function round(num, pow)--{{{
     local p = 10^(pow or 0)
     return math.floor(num * p + 0.5) / p
 end
 --}}}
-set_title = function() --{{{
-    local function get_state_name(i)--{{{
-        local state = i.state
-        if     (state == 0) then
-            return '0: normal'
-        elseif (state == 1) then
-            return '1: 90°C'
-        elseif (state == 2) then
-            return '2: 180°C'
-        elseif (state == 3) then
-            return '3: 270°C'
-        elseif (state == 4) then
-            return '4: flipped horizontal'
-        elseif (state == 5) then
-            return '5: 90°C and flipped horizontal'
-        elseif (state == 6) then
-            return '6: flipped verticall'
-        elseif (state == 7) then
-            return '7: 270°C and flipped horizontal'
-        end
+--}}}
+--{{{ css: CSS для Gtk3
+local css =
+[===[
+#thumb
+{
+    /*box-shadow:  0px 0px 5px black;*/
+    border:       4px solid white;
+    border-color: #aaaaaa;
+}
+#current_thumb
+{
+    box-shadow:  0px 0px 5px black;
+    border:      4px dotted black;
+    border-color: #ff0000;
+}
+#marked_thumb
+{
+    /*box-shadow:  0px 0px 5px black;*/
+    border:      4px solid yellow;
+    border-color: #ffff00;
+}
+#current_marked_thumb
+{
+    box-shadow:  0px 0px 5px black;
+    border:      4px dotted red;
+    border-color: #ff00ff;
+}
+#window
+{
+}
+]===]
+--}}}
+--{{{ init
+init = function(...)
+    app.title = 'liv'
+    app:style(css)
+    args = {...}
+    for n, path in ipairs(args) do
+        table.insert(files, path)
+        local i = image.new(path)
+        local t = image.new(path)
+        table.insert(images, i)
+        table.insert(thumbs, t)
+        table.insert(marks, false)
+        i.name = 'image'
+        t.name = 'thumb'
+        t.label = nil
     end
-    --}}}
-    local spc   = '  |  '
-    local apn   = tostring(app)
-    local mode  = 'mode: ' .. (state.preview and '«preview» ['..thumbs.size..'px]' or '«frame»')
-    local idx   = '№:'..state.idx
-    local name  = 'file: «'..tostring(current)..'»'..(current.broken and ' (broken)' or '')
-    local w, h  = dims.size(current)
-    local W, H  = dims.native_size(current)
-    local orig  = current.broken and '' or ' ('..W..'x'..H..')'
-    local mkd   = ((not state.preview and marks[state.idx]) and ' <marked>' or '');
-    local z     = 100 * (w / W)
-    local size  = (state.preview and '' or spc .. 'size: ['..w..'x'..h..'] '..round(z)..'%')
-    local state = (state.preview and '' or spc .. get_state_name(current))
-    local pfx   = steward.key_prefix..' '
-    local title = apn .. spc .. pfx .. mode .. spc .. idx .. spc .. name .. mkd .. orig .. state .. size
-    app.title = title
+    navigator.first()
+
+    local size = thumbs.max_size()
+    size = math.min(thumbs.max, math.max(thumbs.min, size))
+    thumbs.size = math.min(thumbs.size, size)
+    resizer.thumbs(thumbs.size)
+
+    if (#files == 1) then
+        viewer.show_frame()
+    else
+        viewer.show_preview()
+    end
+    texter.set_title()
+    texter.set_status()
 end
 --}}}
-thumbs.calc_pos_by_idx = function(idx)--{{{
-    local W, H = app.width, app.height
-    local spacing = preview.spacing
-    local alloc = thumbs[idx].allocation
-    local w, h
-    --if (allocated) then
-        --w = alloc.width  + spacing.row
-        --h = alloc.height + spacing.column
-    --else
-        --w = alloc.natural_width  + spacing.row
-        --h = alloc.natural_height + spacing.column
-    --end
-    w = thumbs.size + spacing.row + 10
-    h = thumbs.size + spacing.column + 10
-    local constrain = math.max(1, math.floor(W / w))
-    local left = ((idx - 1   ) % constrain) + 1
-    local top  = ((idx - left) / constrain) + 1
-    --if (idx < 30) then
-        --print(idx, 'wind', W, H, 'calc', w, h, 'alloc', alloc.width, alloc.height, 'min', alloc.minimum_width, alloc.minimum_height, 'nat', alloc.natural_width, alloc.natural_height)
-    --end
-    return left, top
+--{{{{{{ thumbs: вспомогательные функции
+thumbs.max_alloc = function()--{{{
+    local maxalloc = {width = 0, height = 0}
+    for idx, t in ipairs(thumbs) do
+        local alloc = t.allocation
+        maxalloc.width  = math.max(maxalloc.width,  alloc.width)
+        maxalloc.height = math.max(maxalloc.height, alloc.height)
+    end
+    return maxalloc
+end
+--}}}
+thumbs.max_size = function()--{{{
+    local size = 0
+    for idx, t in ipairs(thumbs) do
+        local w, h = dims.native_size(t);
+        size = math.max(size, math.max(w, h))
+    end
+    return size
 end
 --}}}
 thumbs.pos_by_idx = function(idx)--{{{
@@ -103,37 +139,83 @@ thumbs.idx_by_pos = function(left, top)--{{{
 end
 --}}}
 --}}}}}}
- --{{{ init
-init = function(...)
-    app.title = 'liv'
-    local f = io.open('liv.css')
-    if (f) then
-        local style = f:read('*a')
-        f:close()
-        app:style(style)
-    end
-    args = {...}
-    for n, path in ipairs(args) do
-        table.insert(files, path)
-        local i = image.new(path)
-        local t = image.new(path)
-        local w, h = dims.native_size(t);
-        thumbs.size = math.min(thumbs.max, math.max(thumbs.min, math.max(w, h)))
-        table.insert(images, i)
-        table.insert(thumbs, t)
-        table.insert(marks, false)
-        i.name = 'image'
-        t.name = 'thumb'
-        t.label = n
-    end
-    thumbs_resize(thumbs.size, thumbs.size)
+--{{{ mkup: pango markup
+mkup =
+{
+bold      = function(text) return '<b>'     .. tostring(text) .. '</b>'     end,
+italic    = function(text) return '<i>'     .. tostring(text) .. '</i>'     end,
+strike    = function(text) return '<s>'     .. tostring(text) .. '</s>'     end,
+underline = function(text) return '<u>'     .. tostring(text) .. '</u>'     end,
+monospace = function(text) return '<tt>'    .. tostring(text) .. '</tt>'    end,
+big       = function(text) return '<big>'   .. tostring(text) .. '</big>'   end,
+small     = function(text) return '<small>' .. tostring(text) .. '</small>' end,
 
-    navigator.first()
-    viewer.show_preview()
-    set_title()
-end
+r = function(text) return '<span background="#ff8888">' .. tostring(text) .. '</span>' end,
+g = function(text) return '<span background="#88ff88">' .. tostring(text) .. '</span>' end,
+b = function(text) return '<span background="#8888ff">' .. tostring(text) .. '</span>' end,
+c = function(text) return '<span background="#88ffff">' .. tostring(text) .. '</span>' end,
+y = function(text) return '<span background="#ffff88">' .. tostring(text) .. '</span>' end,
+m = function(text) return '<span background="#ff88ff">' .. tostring(text) .. '</span>' end,
+d = function(text) return '<span background="#000000">' .. tostring(text) .. '</span>' end,
+w = function(text) return '<span background="#ffffff">' .. tostring(text) .. '</span>' end,
+}
 --}}}
---{{{{{{ навигация
+--{{{{{{texter: статусы
+texter =
+{
+image_state_name = function(i)--{{{
+    local state = i.state
+    if     (state == 0) then
+        return '0: normal'
+    elseif (state == 1) then
+        return '1: 90°C'
+    elseif (state == 2) then
+        return '2: 180°C'
+    elseif (state == 3) then
+        return '3: 270°C'
+    elseif (state == 4) then
+        return '4: flipped horizontal'
+    elseif (state == 5) then
+        return '5: 90°C and flipped horizontal'
+    elseif (state == 6) then
+        return '6: flipped verticall'
+    elseif (state == 7) then
+        return '7: 270°C and flipped horizontal'
+    end
+end,
+--}}}
+set_title = function() --{{{
+    local spc   = ' | '
+    local apn   = tostring(app)
+    local name  = tostring(IMG)..(IMG.broken and ' (broken)' or '')
+    local title = apn .. spc .. name
+    app.title = title
+end,
+--}}}
+set_status = function() --{{{
+    local cond    = function(cond, s) return cond and s or '' end
+    local spc     = ' '
+    local w, h  = dims.size(IMG)
+    local W, H  = dims.native_size(IMG)
+    local z     = 100 * (w / W)
+
+    local mode  = mkup.m('mode:')..(state.preview and 'preview ['..thumbs.size..'px]' or 'frame')
+    local idx   = mkup.m('№:')..(IMG.broken and mkup.r(state.idx) or mkup.g(state.idx))..' of '..#files
+    local mkd   = cond(marks[state.idx], mkup.y('mark'));
+    local imgst = cond((not state.preview), mkup.m('state:')..texter.image_state_name(IMG))
+
+    local pfx   = cond((steward.key_prefix ~= ''), mkup.m('prefix:')..mkup.y(steward.key_prefix))
+    local size  = cond((not IMG.broken), mkup.m('size:')..'['..W..'x'..H..']')
+    local pl, pt = thumbs.pos_by_idx(state.idx)
+    local pos   = cond(state.preview, mkup.m('grid:')..'('..pl..','..pt..')')
+    local scale = cond(not state.preview, mkup.m('scale:')..'['..w..'x'..h..'] '..round(z)..'%')
+    app.status_left  = mode..spc ..idx..spc ..mkd..spc ..size..spc ..imgst
+    app.status_right = pos..spc ..scale .. pfx
+end,
+--}}}
+}
+--}}}}}}
+--{{{{{{ navigator: навигация
 navigator =
 {
 next  = function() viewer.move( 1)     end,
@@ -169,9 +251,32 @@ left  = function() navigator.direction(-1,  0) end,
 right = function() navigator.direction( 1,  0) end,
 }
 --}}}}}}
---{{{{{{ просмотр
+--{{{{{{ viewer: просмотр
 viewer =
 {
+set_labels = function(st)--{{{
+    if (not st or (st.index == state.labels.index and st.path == state.labels.path)) then
+        return
+    end
+    state.labels.index = st.index
+    state.labels.path  = st.path
+    for idx, t in ipairs(thumbs) do
+        local l = ''
+        if (state.labels.index) then
+            l = l .. idx .. ' '
+        end
+        if (state.labels.path) then
+            l = l .. string.gsub(t.path, '(.*/)(.*)', '%2')
+            --l = l .. t.path
+        end
+        if (l == '') then
+            l = nil
+        end
+        t.label = l
+    end
+    viewer.fill_preview()
+end,
+--}}}
 set = function(idx) --{{{
     local max = #images
     if (max == 0) then
@@ -188,10 +293,13 @@ set = function(idx) --{{{
 
     marker.swap(old, idx)
 
-    current = images[idx]
     state.idx = idx
+    if (state.preview) then
+        scroller.preview_adjust_to_current()
+    end
     frame:clear()
-    frame:attach(current, 1, 1)
+    frame:attach(IMG, 1, 1)
+    texter.set_title()
 end,
 --}}}
 move = function(shift)--{{{
@@ -221,40 +329,42 @@ end,
 fill_preview = function()--{{{
     preview:clear()
     if (#thumbs == 0) then return end
+    local maxalloc = 1
     for idx, t in ipairs(thumbs) do
-        local W, H = app.width, app.height
-        local spacing = preview.spacing
         local alloc = t.allocation
-        local w = math.max(1, alloc.natural_width  + spacing.row)
-        local h = math.max(1, alloc.natural_height + spacing.column)
-        w = math.max(thumbs.size + math.max(spacing.row, spacing.column), math.max(w, h))
-        local constrain = math.max(1, math.floor(W / w))
-        local square = math.ceil(math.sqrt(#thumbs))
-        constrain = math.min(square, constrain)
+        local w = math.max(1, alloc.natural_width)
+        local h = math.max(1, alloc.natural_height)
+        local s = math.max(w, h)
+        if (maxalloc < s) then
+            maxalloc = s
+        end
+    end
+    local spacing = preview.spacing
+    maxalloc = maxalloc + math.max(spacing.row, spacing.column)
+    local W, H = app.width, app.height
+    -- растем вниз
+    local constrain = math.max(1, math.floor(W / maxalloc))
+    local square = math.ceil(math.sqrt(#thumbs))
+    constrain = math.min(square, constrain)
+    for idx, t in ipairs(thumbs) do
         local left = ((idx - 1   ) % constrain) + 1
         local top  = ((idx - left) / constrain) + 1
-        if (idx == 8) then
-            print(idx,
-            'wind', W, H,
-            'calc', w, h,
-            'alloc', alloc.width, alloc.height,
-            'min', alloc.minimum_width, alloc.minimum_height,
-            'nat', alloc.natural_width, alloc.natural_height
-            )
-        end
         preview:attach(t, left, top)
     end
 end,
 --}}}
 update = --{{{
 {
-    [frame]   = function() resizer.in_window_if_larger(current) end,
-    [preview] = function() viewer.fill_preview() end,
+    [frame]   = function()
+    end,
+    [preview] = function()
+        viewer.fill_preview()
+    end,
 },
 --}}}
 }
 --}}}}}}
---{{{{{{ метки
+--{{{{{{ marker: метки
 marker =
 {
 swap = function(old, new)--{{{
@@ -321,9 +431,17 @@ current_only = function()--{{{
     marker.set(state.idx)
 end,
 --}}}
+print = function()--{{{
+    for idx, path in ipairs(files) do
+        if (marks[idx]) then
+            print(path)
+        end
+    end
+end,
+--}}}
 }
 --}}}}}}
---{{{{{{ вычисления размеров
+--{{{{{{ dims: вычисления размеров
 dims =
 {
 native_size = function(i) --{{{
@@ -335,9 +453,6 @@ native_size = function(i) --{{{
 end,
 --}}}
 size = function(i) --{{{
-    if (i == app) then
-        return app.width, app.height
-    end
     local w, h = i.width, i.height
     return w, h
 end,
@@ -372,7 +487,7 @@ end,
 --}}}
 native_fits = function(i, W, H) --{{{
     local w, h = dims.native_size(i)
-    return (w <= W and h <=H)
+    return (w <= W and h <= H)
 end,
 --}}}
 real_min = function(i, min) --{{{
@@ -383,27 +498,16 @@ real_max = function(i, max) --{{{
     return math.max(max, math.max(dims.native_size(i)))
 end,
 --}}}
-real_constraints = function(i, min, max) --{{{
+real_constraints = function(i) --{{{
+    local min, max = default_constraints.min, default_constraints.max
     return dims.real_min(i, min), dims.real_max(i, max)
 end,
 }
 --}}}
 --}}}}}}
---{{{{{{ масштабирование
-thumbs_resize = function(s) --{{{
-    if (s > thumbs.max) then
-        s = thumbs.max
-    elseif (s < thumbs.min) then
-        s = thumbs.min
-    end
-    thumbs.size = s
-    for i, t in ipairs(thumbs) do
-        if (not dims.native_fits(t, s, s)) then
-            t:scale(dims.inscribe(t, s, s))
-        end
-    end
-end
---}}}
+--{{{{{{ resizer: масштабирование
+resizer =
+{
 zoom = function(i, p, min, max) --{{{
     min = min and min or default_constraints.min
     max = max and max or default_constraints.max
@@ -420,70 +524,125 @@ zoom = function(i, p, min, max) --{{{
         if (w >= h) then w, h = max, max / a else w, h = max * a, max end
     end
     i:scale(w, h)
-end
+end,
 --}}}
-resizer = --{{{
-{
-    if_larger = function(i, w, h)
-        if (not dims.native_fits(i, w, h)) then
-            i:scale(w, h)
+thumbs = function(s) --{{{
+    s = math.min(thumbs.max, s)
+    s = math.max(thumbs.min, s)
+    thumbs.size = s
+    for i, t in ipairs(thumbs) do
+        if (not dims.native_fits(t, s, s)) then
+            t:scale(dims.inscribe(t, s, s))
+        else
+            t:scale(dims.native_size(t))
         end
-    end,
-    to_native = function(i) i:scale(dims.native_size(i)) end,
-    to_window = function(i) i:scale(dims.size(app)) end,
-    to_window_if_larger = function(i)
-        if (not dims.native_fits(i, dims.size(app))) then
-            resizer.to_window(i)
-        end
-    end,
-    in_window = function(i) i:scale(dims.inscribe(i, dims.size(app))) end,
-    in_window_if_larger = function(i)
-        if (not dims.native_fits(i, dims.size(app))) then
-            resizer.in_window(i)
-        end
-    end,
-    zoom = zoom,
+    end
+    viewer.fill_preview()
+end,
+--}}}
+if_larger = function(i, w, h)--{{{
+    if (not dims.native_fits(i, w, h)) then
+        i:scale(w, h)
+    end
+end,
+--}}}
+to_native = function(i)--{{{
+    i:scale(dims.native_size(i))
+end,
+--}}}
+to_window = function(i)--{{{
+    i:scale(app.width, app.height)
+end,
+--}}}
+to_window_if_larger = function(i)--{{{
+    if (not dims.native_fits(i, app.width, app.height)) then
+        resizer.to_window(i)
+    end
+end,
+--}}}
+in_window = function(i)--{{{
+i:scale(dims.inscribe(i, app.width, app.height))
+end,
+--}}}
+in_window_if_larger = function(i)--{{{
+    if (not dims.native_fits(i, app.width, app.height)) then
+        resizer.in_window(i)
+    end
+end,
+--}}}
 }
---}}}
 --}}}}}}
---{{{{{{ скроллинг
-function scroll_frame(horizontal, percent) --{{{
-    local w, h = dims.size(current)
-    if (horizontal) then
-        app.hscroll = app.hscroll + percent / 100 * w
-    else
-        app.vscroll = app.vscroll + percent / 100 * h
-    end
-end
+--{{{{{{ scroller: скроллинг
+scroller =
+{
+frame = function(hor, ver) --{{{
+    app.hscroll = app.hscroll + app.max_hscroll * hor
+    app.vscroll = app.vscroll + app.max_vscroll * ver
+end,
 --}}}
-function scroll_preview(horizontal, step) --{{{
-    local space = preview.spacing
-    --local border = 10
-    --if (horizontal) then
-        --app.hscroll = app.hscroll + step*(thumbs.size + space.row + border)
-    --else
-        --app.vscroll = app.vscroll + step*(thumbs.size + space.column + border)
-    --end
-    local alloc = thumbs[state.idx].allocation
-    if (horizontal) then
-        app.hscroll = app.hscroll + step*(alloc.width + space.row)
+frame_percent = function(hor, ver, absolute) --{{{
+    local ch, ch
+    if (absolute) then
+        ch, cv = 0, 0
     else
-        app.vscroll = app.vscroll + step*(alloc.height + space.column)
+        ch, cv = app.hscroll, app.vscroll
     end
-end
+    app.hscroll = ch + app.max_hscroll * hor / 100
+    app.vscroll = cv + app.max_vscroll * ver / 100
+end,
 --}}}
---}}}}}}
+frame_center = function()--{{{
+    app.hscroll = 0.5 * (app.max_hscroll - app.width)
+    app.vscroll = 0.5 * (app.max_vscroll - app.height)
+end,
+--}}}
+preview = function(left_step, top_step) --{{{
+    local spacing = preview.spacing
+    local alloc   = thumbs.max_alloc()
+    app.hscroll = app.hscroll + left_step*(alloc.width + spacing.row)
+    app.vscroll = app.vscroll + top_step*(alloc.height + spacing.column)
+end,
+--}}}
+preview_set = function(left, top) --{{{
+    local spacing = preview.spacing
+    local alloc   = thumbs.max_alloc()
+    app.hscroll = (left - 1)*(alloc.width + spacing.row)
+    app.vscroll = (top  - 1)*(alloc.height + spacing.column)
+end,
+--}}}
+preview_adjust_to_current = function()--{{{
+    local spacing = preview.spacing
+    local alloc = thumbs.max_alloc()
+    local cl, ct = thumbs.pos_by_idx(state.idx)
+    local w, h = alloc.width + spacing.row, alloc.height + spacing.column
+    local L, T = math.ceil(app.hscroll / w) + 1, math.ceil(app.vscroll / h) + 1
+    local r, c = math.floor(app.width / w), math.floor(app.height / h)
+    local visible = (cl >= L and cl + 1 <= L + r and ct >= T and ct + 1 <= T + c)
+    if (not visible) then
+        local l = ((cl < L) and (cl) or ((cl + 1>= L + r) and (cl - r + 1) or L))
+        local t = ((ct < T) and (ct) or ((ct + 1>= T + c) and (ct - c + 1) or T))
+        scroller.preview_set(l, t)
+    end
+end,
+--}}}
+preview_center = function(left, top) --{{{
+    local spacing = preview.spacing
+    local alloc   = thumbs.max_alloc()
+    local w,  h   = alloc.width + spacing.row, alloc.height + spacing.column
+    local R,  C   = round(app.width/(2*w)), round(app.height/(2*h))
+    scroller.preview_set(math.max(1, left - R), math.max(1, top - C))
+end,
+--}}}
+preview_center_on_current = function() --{{{
+    scroller.preview_center(thumbs.pos_by_idx(state.idx))
+end,
+--}}}
+}
+---}}}}}}
 test = function()
-    --local alloc = thumbs[state.idx].allocation
-    --print('wind', app.width, app.height, 'alloc', alloc.width, alloc.height, 'min', alloc.minimum_width, alloc.minimum_height, 'nat', alloc.natural_width, alloc.natural_height)
-    --local i = preview:child(2, 1)
-    local i = thumbs[8]
-    local sz = preview.size
-    print('alloc', i, i.allocation.width, i.allocation.height)
-    print('size', sz.left, sz.top)
 end
---{{{{{{ горячие клавиши
-steward = --{{{
+--{{{{{{ steward: горячие клавиши
+steward =
 {
 key_prefix = '',
 prefixed = function(func, mul, ...)--{{{
@@ -549,36 +708,39 @@ call = function(hotkey)--{{{
     else
         steward.erase_prefix()
     end
-    set_title()
+    texter.set_status()
 end,
 --}}}
 }
---}}}
+--}}}}}}
+--{{{{{{ hotkeys: горячие клавиши
 prefixed = steward.prefixed
-hotkeys = --{{{
+hotkeys =
 {
     any = --{{{
     {
         {{         }, "m", function() marker.current_toggle() end},
         {{"Shift"  }, "m", function() marker.reverse()        end},
         {{"Control"}, "m", function() marker.reset()          end},
+        {{         }, "y", function() marker.current_toggle() end},
+        {{"Shift"  }, "y", function() marker.reverse()        end},
+        {{"Control"}, "y", function() marker.reset()          end},
 
-        {{         }, "g", prefixed(function(n) navigator.index(n, true) end, 1)},
-        {{"Shift"  }, "g",         function() navigator.last()  end},
+        {{"Control"}, "r", function() for idx, i in ipairs(images) do i:reset() end end},
+
+        {{         }, "b", function() app.status_visible = not app.status_visible end},
+
+        {{         }, "g", prefixed(function(n) navigator.index(n,              true) end,  1)},
+        {{"Shift"  }, "g", prefixed(function(n) navigator.index(#files + 1 + n, true) end, -1)},
         {{"Shift"  }, "6",         function() navigator.first() end}, -- ^
         {{"Shift"  }, "4",         function() navigator.last()  end}, -- $
         {{         }, "space",     function() navigator.next()  end},
         {{         }, "BackSpace", function() navigator.prev()  end},
 
-        {{"Shift"  }, "Q",      function() app:quit()       end},
-        {{         }, "q",      function()
-            for idx, path in ipairs(files) do
-                if (marks[idx]) then
-                    print(path)
-                end
-            end
-            app:quit()
-        end},
+        {{"Shift"  }, "Q",      function() app:quit() end},
+        {{         }, "q",      function() marker.print(); app:quit() end},
+        {{"Shift"  }, "Return", function() marker.print(); app:quit() end},
+
         {{         }, "t",      function() viewer.toggle_mode() end},
         {{         }, "Return", function() viewer.toggle_mode() end},
     },
@@ -590,63 +752,86 @@ hotkeys = --{{{
         {{         }, "k", function() navigator.prev() end},
         {{         }, "l", function() navigator.next() end},
 
-        {{         }, "Left",  prefixed(function(n) scroll_frame(true,  n) end, -10)},
-        {{         }, "Right", prefixed(function(n) scroll_frame(true,  n) end,  10)},
-        {{         }, "Down",  prefixed(function(n) scroll_frame(false, n) end,  10)},
-        {{         }, "Up",    prefixed(function(n) scroll_frame(false, n) end, -10)},
+        {{         }, "Left",  prefixed(function(n) scroller.frame_percent(n, 0) end, -images.scroll_step)},
+        {{         }, "Right", prefixed(function(n) scroller.frame_percent(n, 0) end,  images.scroll_step)},
+        {{         }, "Down",  prefixed(function(n) scroller.frame_percent(0, n) end,  images.scroll_step)},
+        {{         }, "Up",    prefixed(function(n) scroller.frame_percent(0, n) end, -images.scroll_step)},
+        {{"Shift"  }, "c",     function(n) scroller.frame_center() end},
+        {{"Shift"  }, "Left",  function(n) scroller.frame(-1,  0) end},
+        {{"Shift"  }, "Right", function(n) scroller.frame( 1,  0) end},
+        {{"Shift"  }, "Down",  function(n) scroller.frame( 0,  1) end},
+        {{"Shift"  }, "Up",    function(n) scroller.frame( 0, -1) end},
 
-        {{         }, "s",     function() resizer.to_native(current)           end},
-        {{         }, "w",     function() resizer.to_window_if_larger(current) end},
-        {{"Control"}, "w",     function() resizer.to_window(current)           end},
-        {{"Shift"  }, "a",     function() resizer.in_window(current)           end},
-        {{"Control"}, "a",     function() resizer.in_window_if_larger(current) end},
-        {{         }, "a", function()
-            current:reset()
-            resizer.in_window_if_larger(current)
-        end},
-        {{         }, "minus", function() resizer.zoom(current, -20, dims.real_constraints(current, 64, 1000)) end},
-        {{         }, "equal", function() resizer.zoom(current,  20, dims.real_constraints(current, 64, 1000)) end},
-        {{         }, "r",            function() current:reset()       end},
-        {{         }, "bracketleft",  function() current:rotate(false) end},
-        {{         }, "bracketright", function() current:rotate(true)  end},
-        {{         }, "f",            function() current:flip(true)    end},
-        {{"Control"}, "f",            function() current:flip(false)   end},
+        {{         }, "s",     function() resizer.to_native(IMG)           end},
+        {{         }, "w",     function() resizer.to_window_if_larger(IMG) end},
+        {{"Control"}, "w",     function() resizer.to_window(IMG)           end},
+        {{"Control"}, "a",     function() resizer.in_window(IMG)           end},
+        {{         }, "a",     function() resizer.in_window_if_larger(IMG) end},
+        {{         }, "minus", function() resizer.zoom(IMG, -images.zoom_step, dims.real_constraints(IMG)) end},
+        {{         }, "equal", function() resizer.zoom(IMG,  images.zoom_step, dims.real_constraints(IMG)) end},
+
+        {{         }, "r",            function() IMG:reset()       end},
+        {{         }, "bracketleft",  function() IMG:rotate(false) end},
+        {{         }, "bracketright", function() IMG:rotate(true)  end},
+        {{         }, "f",            function() IMG:flip(true)    end},
+        {{         }, "v",            function() IMG:flip(false)   end},
     },
     --}}}
     preview = --{{{
     {
-        {{         }, "i", function() viewer.fill_preview() end},
-        {{         }, "u", test },
+        --{{"Control"}, "I", function() viewer.fill_preview() end},
+        {{         }, "i", test},
 
         {{         }, "h", function() navigator.left()  end},
         {{         }, "j", function() navigator.down()  end},
         {{         }, "k", function() navigator.up()    end},
         {{         }, "l", function() navigator.right() end},
 
-        {{         }, "Left",  function() scroll_preview(true,  -1) end},
-        {{         }, "Right", function() scroll_preview(true,   1) end},
-        {{         }, "Down",  function() scroll_preview(false,  1) end},
-        {{         }, "Up",    function() scroll_preview(false, -1) end},
+        {{"Shift"  }, "l", function() viewer.set_labels({index = state.labels.index,     path = not state.labels.path}) end},
+        {{"Shift"  }, "n", function() viewer.set_labels({index = not state.labels.index, path = state.labels.path})     end},
+        {{"Control"}, "l", function() viewer.set_labels({index = true,  path = true})  end},
+        {{"Control"}, "n", function() viewer.set_labels({index = false, path = false}) end},
 
-        {{         }, "minus", function() thumbs_resize(thumbs.size - 16) end},
-        {{         }, "equal", function() thumbs_resize(thumbs.size + 16) end},
+        {{         }, "Left",  prefixed(function(n) scroller.preview(n, 0)  end, -1)},
+        {{         }, "Right", prefixed(function(n) scroller.preview(n, 0)  end,  1)},
+        {{         }, "Down",  prefixed(function(n) scroller.preview(0, n)  end,  1)},
+        {{         }, "Up",    prefixed(function(n) scroller.preview(0, n)  end, -1)},
+        {{"Shift"  }, "c",     function() scroller.preview_center_on_current() end},
+
+        {{         }, "minus", prefixed(function(n) resizer.thumbs(thumbs.size + n) end, -thumbs.step)},
+        {{         }, "equal", prefixed(function(n) resizer.thumbs(thumbs.size + n) end,  thumbs.step)},
     },
     --}}}
 }
---}}}
 --{{{ набор префикса
 for n=0, 9 do
     table.insert(hotkeys.any, {{}, tostring(n), function() steward.key_prefix = steward.key_prefix..tostring(n) end})
 end
 --}}}
 --}}}}}}
---{{{{{{ колбеки
-local ww, hh
+--{{{{{{ callbacks: колбеки
 callbacks =
 {
+scroll =--{{{
+{
+    value = function()--{{{
+            --print('scroll changed')
+    end,
+    --}}}
+    other = function()--{{{
+        --print('something changed')
+        if (state.preview) then
+            scroller.preview_center_on_current()
+        else
+            --resizer.in_window_if_larger(IMG)
+        end
+    end,
+    --}}}
+},
+--}}}
 resize = function(w, h)--{{{
-    if ((ww and hh) and (ww ~= w or hh ~= h)) then
-        print('resize', ww, hh, w, h, dims.size(app))
+    if (state.appsize and (state.appsize.w ~= w or state.appsize.h ~= h)) then
+        --print('resize', state.appsize.w, state.appsize.h, w, h, app.width, app.height)
         if (state.preview) then
             viewer.update[preview]()
         else
@@ -654,7 +839,7 @@ resize = function(w, h)--{{{
         end
         state.update = true
     end
-    ww, hh = w, h
+    state.appsize = {w = w, h = h}
 end,
 --}}}
 keypress = function(mods, name, value)--{{{
