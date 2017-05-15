@@ -3,17 +3,18 @@
 
 #include "imageL.h"
 #include "gridL.h"
+#include "frameL.h"
 #include "appL.h"
 
-#include <math.h>
-#include <string.h>
+/*#include <math.h>*/
+/*#include <string.h>*/
 
 #include <stdlib.h>
 #include <unistd.h>
 #include <locale.h>
 
-#include <gtk/gtk.h>
-#include <glib/gprintf.h>
+/*#include <gtk/gtk.h>*/
+/*#include <glib/gprintf.h>*/
 
 static gboolean luaH_init(void)
 {
@@ -23,6 +24,7 @@ static gboolean luaH_init(void)
     luaL_openlibs(L);
     luaopen_imageL(L, LIB_IMAGEL);
     luaopen_gridL(L, LIB_GRIDL);
+    luaopen_frameL(L, LIB_FRAMEL);
     luaopen_appL(L, LIB_APPL);
     return TRUE;
 }
@@ -87,20 +89,21 @@ static gboolean luaH_loadrc(gchar* confpath)
     return FALSE;
 }
 
-static void cb_size(GtkWidget *widget, GdkRectangle *rect, gpointer user_data)
+static void cb_size(GtkWidget *widget, GdkRectangle *rect, gpointer data)
 {
-    gint w, h;
     gint top = lua_gettop(L);
     lua_getglobal(L, "callbacks");
     if (lua_istable(L, -1))
     {
-        lua_getfield(L, -1, "resize");
+        lua_getfield(L, -1, "size");
         if (lua_isfunction(L, -1))
         {
-            gtk_window_get_size(window, &w, &h);
-            lua_pushnumber(L, w);
-            lua_pushnumber(L, h);
-            luaH_pcall(L, 2, 0);
+            lua_pushstring(L, (gchar*)data);
+            lua_pushnumber(L, rect->x);
+            lua_pushnumber(L, rect->y);
+            lua_pushnumber(L, rect->width);
+            lua_pushnumber(L, rect->height);
+            luaH_pcall(L, 5, 0);
         }
     }
     lua_settop(L, top);
@@ -154,40 +157,6 @@ static void cb_key(GtkWidget *widget, GdkEventKey *ev, gpointer user_data)
     lua_settop(L, top);
 }
 
-static void cb_scroll_value(GtkAdjustment *adj, gpointer user_data)
-{
-    gint top = lua_gettop(L);
-    lua_getglobal(L, "callbacks");
-    if (lua_istable(L, -1))
-    {
-        lua_getfield(L, -1, "scroll");
-        if (lua_istable(L, -1))
-        {
-            lua_getfield(L, -1, "value");
-            if (lua_isfunction(L, -1))
-                luaH_pcall(L, 0, 0);
-        }
-    }
-    lua_settop(L, top);
-}
-
-static void cb_scroll_other(GtkAdjustment *adj, gpointer user_data)
-{
-    gint top = lua_gettop(L);
-    lua_getglobal(L, "callbacks");
-    if (lua_istable(L, -1))
-    {
-        lua_getfield(L, -1, "scroll");
-        if (lua_istable(L, -1))
-        {
-            lua_getfield(L, -1, "other");
-            if (lua_isfunction(L, -1))
-                luaH_pcall(L, 0, 0);
-        }
-    }
-    lua_settop(L, top);
-}
-
 gint main(gint argc, gchar **argv)
 {
     setlocale(LC_ALL, "");
@@ -218,24 +187,23 @@ gint main(gint argc, gchar **argv)
     gtk_widget_set_name((GtkWidget*)window, "window");
 
     mainbox   = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
+    content   = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
     statusbox = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_set_name((GtkWidget*)content,   "content");
+    gtk_widget_set_name((GtkWidget*)statusbox, "status");
+    gtk_box_pack_start(mainbox, (GtkWidget*)content,   TRUE,  TRUE,  0);
+    gtk_box_pack_end(  mainbox, (GtkWidget*)statusbox, FALSE, FALSE, 0);
 
-    scroll = gtk_scrolled_window_new(NULL, NULL);
-    gtk_widget_set_name((GtkWidget*)scroll, "scroll");
-    gtk_box_pack_start(mainbox, (GtkWidget*)scroll, TRUE, TRUE, 0);
-    gtk_box_pack_end(mainbox, (GtkWidget*)statusbox, FALSE, FALSE, 0);
-
-    status_left = (GtkLabel*)gtk_label_new("");
-    gtk_label_set_xalign(status_left, 0);
+    status_left  = (GtkLabel*)gtk_label_new("");
     status_right = (GtkLabel*)gtk_label_new("");
+    gtk_label_set_xalign(status_left,  0);
     gtk_label_set_xalign(status_right, 1);
-    gtk_label_set_line_wrap(status_left, TRUE);
+    gtk_label_set_line_wrap(status_left,  TRUE);
     gtk_label_set_line_wrap(status_right, TRUE);
     gtk_widget_set_name((GtkWidget*)status_left,  "status_left");
     gtk_widget_set_name((GtkWidget*)status_right, "status_right");
-
-    gtk_box_pack_start(statusbox, (GtkWidget*)status_left, TRUE, TRUE, 0);
-    gtk_box_pack_end(statusbox, (GtkWidget*)status_right, FALSE, FALSE, 0);
+    gtk_box_pack_start(statusbox, (GtkWidget*)status_left,  TRUE,  TRUE,  0);
+    gtk_box_pack_end(  statusbox, (GtkWidget*)status_right, FALSE, FALSE, 0);
 
     gtk_container_add(GTK_CONTAINER(window), (GtkWidget*)mainbox);
 
@@ -251,15 +219,10 @@ gint main(gint argc, gchar **argv)
         lua_pushstring(L, argv[i]);
     luaH_pcall(L, argc - 1, 0);
 
-    GtkAdjustment* hadj = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
-    GtkAdjustment* vadj = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
-    g_signal_connect(window, "destroy",         G_CALLBACK(gtk_main_quit),   NULL);
-    g_signal_connect(window, "size-allocate",   G_CALLBACK(cb_size),         NULL);
-    g_signal_connect(window, "key-press-event", G_CALLBACK(cb_key),          NULL);
-    g_signal_connect(vadj,   "value-changed",   G_CALLBACK(cb_scroll_value), NULL);
-    g_signal_connect(vadj,   "changed",         G_CALLBACK(cb_scroll_other), NULL);
-    g_signal_connect(hadj,   "value-changed",   G_CALLBACK(cb_scroll_value), NULL);
-    g_signal_connect(hadj,   "changed",         G_CALLBACK(cb_scroll_other), NULL);
+    g_signal_connect(window,  "destroy",         G_CALLBACK(gtk_main_quit), NULL);
+    g_signal_connect(window,  "key-press-event", G_CALLBACK(cb_key),        NULL);
+    g_signal_connect(window,  "size-allocate",   G_CALLBACK(cb_size),       "window");
+    g_signal_connect(content, "size-allocate",   G_CALLBACK(cb_size),       "content");
 
     gtk_widget_show_all((GtkWidget*)window);
     gtk_main();

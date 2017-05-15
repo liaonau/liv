@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 
+
 static int quit_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -23,6 +24,26 @@ static int resize_appL(lua_State *L)
     return 0;
 }
 
+static int content_size_appL(lua_State *L)
+{
+    luaL_checkudata(L, 1, UDATA_APPL);
+    GtkAllocation alloc;
+    gtk_widget_get_allocation((GtkWidget*)content, &alloc);
+    lua_pushnumber(L, alloc.width);
+    lua_pushnumber(L, alloc.height);
+    return 2;
+}
+
+static int window_size_appL(lua_State *L)
+{
+    luaL_checkudata(L, 1, UDATA_APPL);
+    gint w, h;
+    gtk_window_get_size(window, &w, &h);
+    lua_pushnumber(L, w);
+    lua_pushnumber(L, h);
+    return 2;
+}
+
 static int style_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -32,15 +53,15 @@ static int style_appL(lua_State *L)
         return 0;
     guint priority = lua_toboolean(L, 3) ? GTK_STYLE_PROVIDER_PRIORITY_FALLBACK : GTK_STYLE_PROVIDER_PRIORITY_USER;
     GtkCssProvider* provider = gtk_css_provider_new();
-    if (!gtk_css_provider_load_from_data(provider, data, size, NULL))
-        return 0;
+    gtk_css_provider_load_from_data(provider, data, size, NULL);
     GdkDisplay* display = gdk_display_get_default();
     GdkScreen*  screen  = gdk_display_get_default_screen(display);
     gtk_style_context_add_provider_for_screen(screen, GTK_STYLE_PROVIDER(provider), priority);
+    g_object_unref(provider);
     return 0;
 }
 
-static const int IDontKnowWhyGtkAdds2Pixels = 2;
+
 static int index_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -49,42 +70,10 @@ static int index_appL(lua_State *L)
         lua_pushstring(L, APPNAME);
     else if (g_strcmp0(field, "title") == 0)
         lua_pushstring(L, gtk_window_get_title(window));
-    else if (g_strcmp0(field, "width") == 0)
-    {
-        GtkAllocation alloc;
-        gtk_widget_get_allocation((GtkWidget*)scroll, &alloc);
-        lua_pushnumber(L, alloc.width - IDontKnowWhyGtkAdds2Pixels);
-    }
-    else if (g_strcmp0(field, "height") == 0)
-    {
-        GtkAllocation alloc;
-        gtk_widget_get_allocation((GtkWidget*)scroll, &alloc);
-        lua_pushnumber(L, alloc.height - IDontKnowWhyGtkAdds2Pixels);
-    }
-    else if (g_strcmp0(field, "hscroll") == 0)
-    {
-        GtkAdjustment* adj = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
-        gdouble value = gtk_adjustment_get_value(adj);
-        lua_pushnumber(L, value);
-    }
-    else if (g_strcmp0(field, "vscroll") == 0)
-    {
-        GtkAdjustment* adj = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
-        gdouble value = gtk_adjustment_get_value(adj);
-        lua_pushnumber(L, value);
-    }
-    else if (g_strcmp0(field, "max_hscroll") == 0)
-    {
-        GtkAdjustment* adj = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
-        gdouble value = gtk_adjustment_get_upper(adj);
-        lua_pushnumber(L, value);
-    }
-    else if (g_strcmp0(field, "max_vscroll") == 0)
-    {
-        GtkAdjustment* adj = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
-        gdouble value = gtk_adjustment_get_upper(adj);
-        lua_pushnumber(L, value);
-    }
+    else if (g_strcmp0(field, "window_size") == 0)
+        lua_pushcfunction(L, window_size_appL);
+    else if (g_strcmp0(field, "content_size") == 0)
+        lua_pushcfunction(L, content_size_appL);
     else if (g_strcmp0(field, "status_visible") == 0)
     {
         gboolean visible = gtk_widget_get_visible((GtkWidget*)statusbox);
@@ -113,18 +102,6 @@ static int newindex_appL(lua_State *L)
     {
         const gchar* title = luaL_checkstring(L, 3);
         gtk_window_set_title(window, title);
-    }
-    else if (g_strcmp0(field, "hscroll") == 0)
-    {
-        gdouble value = luaL_checknumber(L, 3);
-        GtkAdjustment* adj = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
-        gtk_adjustment_set_value(adj, value);
-    }
-    else if (g_strcmp0(field, "vscroll") == 0)
-    {
-        gdouble value = luaL_checknumber(L, 3);
-        GtkAdjustment* adj = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
-        gtk_adjustment_set_value(adj, value);
     }
     else if (g_strcmp0(field, "status_visible") == 0)
     {
