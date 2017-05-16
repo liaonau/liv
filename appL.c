@@ -3,7 +3,6 @@
 
 #include <stdlib.h>
 
-
 static int quit_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);

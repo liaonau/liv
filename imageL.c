@@ -47,73 +47,59 @@ static void state_adjust_flipped(guint8* state, gboolean horizontal)
 }
 
 
-static void image_transform_pixbuf_by_state(imageL* i)
+static GdkPixbuf* image_transform_pixbuf_by_state(imageL* i)
 {
     GdkPixbuf* pxb = NULL;
     GdkPixbuf* secondpxb = NULL;
 
-    if (i->state == 0)
-        return;
-    else
+    switch (i->state)
     {
-        switch (i->state)
-        {
-        case 0: //нейтральный элемент группы
-            break;
-        case 1:
-            pxb = gdk_pixbuf_rotate_simple(i->nativepxb, GDK_PIXBUF_ROTATE_CLOCKWISE);
-            break;
-        case 2:
-            pxb = gdk_pixbuf_rotate_simple(i->nativepxb, GDK_PIXBUF_ROTATE_UPSIDEDOWN);
-            break;
-        case 3:
-            pxb = gdk_pixbuf_rotate_simple(i->nativepxb, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
-            break;
-        case 4:
-            pxb = gdk_pixbuf_flip(i->nativepxb, TRUE);
-            break;
-        case 5:
-            secondpxb = gdk_pixbuf_rotate_simple(i->nativepxb, GDK_PIXBUF_ROTATE_CLOCKWISE);
-            g_object_unref(i->pxb);
-            i->pxb = secondpxb;
-            pxb = gdk_pixbuf_flip(i->pxb, TRUE);
-            break;
-        case 6:
-            pxb = gdk_pixbuf_flip(i->nativepxb, FALSE);
-            break;
-        case 7:
-            secondpxb = gdk_pixbuf_rotate_simple(i->nativepxb, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
-            g_object_unref(i->pxb);
-            i->pxb = secondpxb;
-            pxb = gdk_pixbuf_flip(i->pxb, TRUE);
-            break;
-        }
-        g_object_unref(i->pxb);
-        i->pxb = pxb;
+    case 0: //нейтральный элемент группы
+        pxb = i->pxb;
+        g_object_ref(pxb);
+        break;
+    case 1:
+        pxb = gdk_pixbuf_rotate_simple(i->pxb, GDK_PIXBUF_ROTATE_CLOCKWISE);
+        break;
+    case 2:
+        pxb = gdk_pixbuf_rotate_simple(i->pxb, GDK_PIXBUF_ROTATE_UPSIDEDOWN);
+        break;
+    case 3:
+        pxb = gdk_pixbuf_rotate_simple(i->pxb, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
+        break;
+    case 4:
+        pxb = gdk_pixbuf_flip(i->pxb, TRUE);
+        break;
+    case 5:
+        secondpxb = gdk_pixbuf_rotate_simple(i->pxb, GDK_PIXBUF_ROTATE_CLOCKWISE);
+        pxb = gdk_pixbuf_flip(secondpxb, TRUE);
+        g_object_unref(secondpxb);
+        break;
+    case 6:
+        pxb = gdk_pixbuf_flip(i->pxb, FALSE);
+        break;
+    case 7:
+        secondpxb = gdk_pixbuf_rotate_simple(i->pxb, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
+        pxb = gdk_pixbuf_flip(secondpxb, TRUE);
+        g_object_unref(secondpxb);
+        break;
     }
+    return pxb;
 }
 
-static void image_load_pixbuf(imageL* i, const gchar* path)
+static void image_load_pixbuf(imageL* i)
 {
-    g_free(i->path);
-    i->path = g_strdup(path);
-
-    if (i->nativepxb && GDK_IS_PIXBUF(i->nativepxb))
-        g_object_unref(i->nativepxb);
     if (i->pxb && GDK_IS_PIXBUF(i->pxb))
         g_object_unref(i->pxb);
 
-    if (path)
-        i->nativepxb = gdk_pixbuf_new_from_file(path, NULL);
-    if (!i->nativepxb || !GDK_IS_PIXBUF(i->nativepxb))
+    i->pxb = gdk_pixbuf_new_from_file(i->path, NULL);
+    if (!i->pxb || !GDK_IS_PIXBUF(i->pxb))
     {
-        i->nativepxb = brokenpbx;
+        i->pxb    = brokenpbx;
         i->broken = TRUE;
     }
     else
         i->broken = FALSE;
-    g_object_ref(i->nativepxb);
-    i->pxb = i->nativepxb;
     g_object_ref(i->pxb);
 
     state_reset(&i->state);
@@ -124,20 +110,32 @@ static int new_imageL(lua_State *L)
 {
     imageL* i = (imageL*)lua_newuserdata(L, sizeof(imageL));
     const gchar* path = luaL_checkstring(L, 1);
-    i->nativepxb = NULL;
-    i->pxb       = NULL;
-    i->path      = NULL;
-    image_load_pixbuf(i, path);
+    i->path  = g_strdup(path);
+    i->pxb   = NULL;
+    i->image = (GtkImage*)gtk_image_new();
+    g_object_ref(i->image);
     luaL_getmetatable(L, UDATA_IMAGEL);
     lua_setmetatable(L, -2);
     return 1;
 }
 
-static int reload_imageL(lua_State* L)
+static int load_imageL(lua_State* L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
-    const gchar* path = luaL_checkstring(L, 2);
-    image_load_pixbuf(i, path);
+    image_load_pixbuf(i);
+    gtk_image_set_from_pixbuf(i->image, i->pxb);
+    return 0;
+}
+
+static int unload_imageL(lua_State* L)
+{
+    imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    if (i->pxb && GDK_IS_PIXBUF(i->pxb))
+        g_object_unref(i->pxb);
+    i->pxb    = NULL;
+    i->broken = FALSE;
+    gtk_image_clear(i->image);
+    state_reset(&i->state);
     return 0;
 }
 
@@ -150,11 +148,12 @@ static int rotate_imageL(lua_State *L)
     if (!clockwise)
         rotation = GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE;
 
-    if (GDK_IS_PIXBUF(i->pxb))
+    GdkPixbuf* pxb = gtk_image_get_pixbuf(i->image);
+    if (GDK_IS_PIXBUF(pxb))
     {
-        GdkPixbuf* pxb = gdk_pixbuf_rotate_simple(i->pxb, rotation);
-        g_object_unref(i->pxb);
-        i->pxb = pxb;
+        GdkPixbuf* newpxb = gdk_pixbuf_rotate_simple(pxb, rotation);
+        gtk_image_set_from_pixbuf(i->image, newpxb);
+        g_object_unref(newpxb);
         state_adjust_rotation(&i->state, clockwise);
     }
     return 0;
@@ -163,13 +162,14 @@ static int rotate_imageL(lua_State *L)
 static int flip_imageL(lua_State *L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
-
     gboolean horizontal = lua_toboolean(L, 2);
+
+    GdkPixbuf* pxb = gtk_image_get_pixbuf(i->image);
     if (GDK_IS_PIXBUF(i->pxb))
     {
-        GdkPixbuf* pxb = gdk_pixbuf_flip(i->pxb, horizontal);
-        g_object_unref(i->pxb);
-        i->pxb = pxb;
+        GdkPixbuf* newpxb = gdk_pixbuf_flip(pxb, horizontal);
+        gtk_image_set_from_pixbuf(i->image, newpxb);
+        g_object_unref(newpxb);
         state_adjust_flipped(&i->state, horizontal);
     }
     return 0;
@@ -179,15 +179,18 @@ static void scale(imageL* i, gint width, gint height)
 {
     if (width <= 0 || height <= 0)
         return;
-    gint w = gdk_pixbuf_get_width(i->pxb);
-    gint h = gdk_pixbuf_get_height(i->pxb);
+    GdkPixbuf* pxb = gtk_image_get_pixbuf(i->image);
+    if (!pxb || !GDK_IS_PIXBUF(pxb))
+        return;
+    gint w = gdk_pixbuf_get_width(pxb);
+    gint h = gdk_pixbuf_get_height(pxb);
     if (w != width || h != height)
     {
-        image_transform_pixbuf_by_state(i);
-        GdkPixbuf* pxb;
-        pxb = gdk_pixbuf_scale_simple(i->pxb, width, height, GDK_INTERP_BILINEAR);
-        g_object_unref(i->pxb);
-        i->pxb = pxb;
+        GdkPixbuf* adjpxb = image_transform_pixbuf_by_state(i);
+        GdkPixbuf* newpxb = gdk_pixbuf_scale_simple(adjpxb, width, height, GDK_INTERP_BILINEAR);
+        g_object_unref(adjpxb);
+        gtk_image_set_from_pixbuf(i->image, newpxb);
+        g_object_unref(newpxb);
     }
 }
 
@@ -203,10 +206,11 @@ static int scale_imageL(lua_State *L)
 static int reset_imageL(lua_State *L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
-    g_object_unref(i->pxb);
-    i->pxb = i->nativepxb;
-    g_object_ref(i->nativepxb);
-    state_reset(&i->state);
+    if (i->pxb && GDK_IS_PIXBUF(i->pxb))
+    {
+        gtk_image_set_from_pixbuf(i->image, i->pxb);
+        state_reset(&i->state);
+    }
     return 0;
 }
 
@@ -214,7 +218,7 @@ static int gc_imageL(lua_State *L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
     g_object_unref(i->pxb);
-    g_object_unref(i->nativepxb);
+    gtk_widget_destroy((GtkWidget*)i->image);
     g_free(i->path);
     return 0;
 }
@@ -233,13 +237,13 @@ static int index_imageL(lua_State *L)
     if (     g_strcmp0(field, "path") == 0)
         lua_pushstring(L, i->path);
     else if (g_strcmp0(field, "width") == 0)
-        lua_pushnumber(L, gdk_pixbuf_get_width(i->pxb));
+        lua_pushnumber(L, gdk_pixbuf_get_width(gtk_image_get_pixbuf(i->image)));
     else if (g_strcmp0(field, "height") == 0)
-        lua_pushnumber(L, gdk_pixbuf_get_height(i->pxb));
+        lua_pushnumber(L, gdk_pixbuf_get_height(gtk_image_get_pixbuf(i->image)));
     else if (g_strcmp0(field, "native_width") == 0)
-        lua_pushnumber(L, gdk_pixbuf_get_width(i->nativepxb));
+        lua_pushnumber(L, gdk_pixbuf_get_width(i->pxb));
     else if (g_strcmp0(field, "native_height") == 0)
-        lua_pushnumber(L, gdk_pixbuf_get_height(i->nativepxb));
+        lua_pushnumber(L, gdk_pixbuf_get_height(i->pxb));
     else if (g_strcmp0(field, "state") == 0)
         lua_pushnumber(L, i->state);
     else if (g_strcmp0(field, "swapped") == 0)
@@ -254,8 +258,10 @@ static int index_imageL(lua_State *L)
         lua_pushcfunction(L, scale_imageL);
     else if (g_strcmp0(field, "reset") == 0)
         lua_pushcfunction(L, reset_imageL);
-    else if (g_strcmp0(field, "reload") == 0)
-        lua_pushcfunction(L, reload_imageL);
+    else if (g_strcmp0(field, "load") == 0)
+        lua_pushcfunction(L, load_imageL);
+    else if (g_strcmp0(field, "unload") == 0)
+        lua_pushcfunction(L, unload_imageL);
     else
         lua_pushnil(L);
     return 1;

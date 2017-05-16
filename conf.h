@@ -9,50 +9,43 @@
 
 #define APPNAME "liv"
 
-#define UDATA_IMAGEL "«image»"
-#define UDATA_GRIDL  "«grid»"
-#define UDATA_FRAMEL "«frame»"
-#define UDATA_APPL   "«app»"
+#define UDATA_IMAGEL  "«image»"
+#define UDATA_GRIDL   "«grid»"
+#define UDATA_SCROLLL "«scroll»"
+#define UDATA_APPL    "«app»"
 
-#define LIB_IMAGEL "image"
-#define LIB_GRIDL  "grid"
-#define LIB_FRAMEL "frame"
-#define LIB_APPL   "app"
+#define LIB_IMAGEL  "image"
+#define LIB_GRIDL   "grid"
+#define LIB_SCROLLL "scroll"
+#define LIB_APPL    "app"
 
 typedef struct appL
 {
 }
 appL;
 
-typedef struct thumb_t
-{
-    GtkFrame* frame;
-    GtkImage* image;
-} thumb_t;
-
 typedef struct gridL
 {
     GtkGrid*   grid;
-    GPtrArray* thumbs;
+    GPtrArray* frames;
 
     gint left;
     gint top;
 }
 gridL;
 
-typedef struct frameL
+typedef struct scrollL
 {
-    GtkImage*          image;
     GtkScrolledWindow* scroll;
 }
-frameL;
+scrollL;
 
 typedef struct imageL
 {
     gchar*     path;
     gboolean   broken;
-    GdkPixbuf* nativepxb;
     GdkPixbuf* pxb;
+    GtkImage*  image;
     guint8     state;
 }
 imageL;

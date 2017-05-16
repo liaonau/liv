@@ -3,18 +3,12 @@
 
 #include "imageL.h"
 #include "gridL.h"
-#include "frameL.h"
+#include "scrollL.h"
 #include "appL.h"
-
-/*#include <math.h>*/
-/*#include <string.h>*/
 
 #include <stdlib.h>
 #include <unistd.h>
 #include <locale.h>
-
-/*#include <gtk/gtk.h>*/
-/*#include <glib/gprintf.h>*/
 
 static gboolean luaH_init(void)
 {
@@ -24,7 +18,7 @@ static gboolean luaH_init(void)
     luaL_openlibs(L);
     luaopen_imageL(L, LIB_IMAGEL);
     luaopen_gridL(L, LIB_GRIDL);
-    luaopen_frameL(L, LIB_FRAMEL);
+    luaopen_scrollL(L, LIB_SCROLLL);
     luaopen_appL(L, LIB_APPL);
     return TRUE;
 }

@@ -1,6 +1,6 @@
 --{{{ глобальные переменные
 images  = {}
-picture = frame.new()
+picture = scroll.new()
 preview = grid.new()
 marks   = {}
 
@@ -21,7 +21,7 @@ state =
     idx     = 1,
     update  = true,
     labels  = {index = false, path = false},
-    appsize = nil,
+    size    = {window = nil, content = nil},
 }
 
 setmetatable(_G,
@@ -78,6 +78,7 @@ init = function(...)
     args = {...}
     for n, path in ipairs(args) do
         local i = image.new(path)
+        i:load()
         table.insert(images, i)
         marks[i] = false
     end
@@ -834,16 +835,16 @@ end
 callbacks =
 {
 size = function(caller, x, y, w, h)--{{{
---print('resize', state.appsize.w, state.appsize.h, w, h, app.width, app.height)
-    --if (state.appsize and (state.appsize.w ~= w or state.appsize.h ~= h)) then
+    if (state.size[caller] and (state.size[caller].w ~= w or state.size[caller].h ~= h)) then
+    print('resize', caller, x, y, w, h)
         --if (state.preview) then
             --viewer.update[preview]()
         --else
             --viewer.update[picture]()
         --end
         --state.update = true
-    --end
-    --state.appsize = {w = w, h = h}
+    end
+    state.size[caller] = {w = w, h = h}
 end,
 --}}}
 keypress = function(mods, name, value)--{{{
