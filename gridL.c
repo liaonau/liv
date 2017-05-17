@@ -2,7 +2,6 @@
 #include "gridL.h"
 #include "imageL.h"
 #include "util.h"
-#include "graph.h"
 
 #define CHECK_ARGS \
     gridL*  g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL); \
@@ -11,28 +10,23 @@
     if (!grid_pos_exists(g, left, top)) \
         return 0; \
     gint idx = grid_index_by_pos(g, left, top); \
-    GtkFrame* frame = (GtkFrame*)g_ptr_array_index(g->frames, idx);
+    GtkFrame* frame = (GtkFrame*)g_ptr_array_index(g->frames, idx); \
 
 static void frame_free(gpointer data)
 {
-    GtkFrame* frame = (GtkFrame*)data;
-    lua_pushlightuserdata(L, (void*)frame);
-    lua_pushnil(L);
-    lua_settable(L, LUA_REGISTRYINDEX);
+    GtkFrame*  frame = (GtkFrame*)data;
+    GtkWidget* image = gtk_bin_get_child(frame);
     gtk_widget_destroy((GtkWidget*)frame);
 }
 
-
 static inline gint grid_index_by_pos(gridL* g, gint left, gint top)
 {
-    return ((top - 1) * g->left + (left - 1));
+    return ((top - 1) * g->rows + (left - 1));
 }
-
 static inline gboolean grid_pos_exists(gridL* g, gint left, gint top)
 {
-    return (left > 0 && top > 0 && left <= g->left && top <= g->top);
+    return (left > 0 && top > 0 && left <= g->rows && top <= g->cols);
 }
-
 
 static int new_gridL(lua_State *L)
 {
@@ -40,28 +34,26 @@ static int new_gridL(lua_State *L)
 
     g->grid  = (GtkGrid*)gtk_grid_new();
     g_object_ref(g->grid);
+    gtk_grid_set_row_spacing(   g->grid, 0);
     gtk_grid_set_column_spacing(g->grid, 0);
-    gtk_grid_set_row_spacing(g->grid, 0);
+    gtk_grid_set_row_homogeneous(   g->grid, TRUE);
     gtk_grid_set_column_homogeneous(g->grid, TRUE);
-    gtk_grid_set_row_homogeneous(g->grid, TRUE);
 
-    g->left = 0;
-    g->top  = 0;
+    g->rows = 0;
+    g->cols = 0;
     g->frames = g_ptr_array_new_with_free_func(&frame_free);
 
     luaL_getmetatable(L, UDATA_GRIDL);
     lua_setmetatable(L, -2);
     return 1;
 }
-
 static int get_size_gridL(lua_State *L)
 {
-    gridL*  g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
-    lua_pushnumber(L, g->left);
-    lua_pushnumber(L, g->top);
+    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    lua_pushnumber(L, g->rows);
+    lua_pushnumber(L, g->cols);
     return 2;
 }
-
 static int set_size_gridL(lua_State *L)
 {
     gridL*  g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
@@ -74,26 +66,33 @@ static int set_size_gridL(lua_State *L)
         left = 0;
         top  = 0;
     }
-    if (left == g->left && top == g->top)
+    if (left == g->rows && top == g->cols)
         return 0;
-    g->left = left;
-    g->top  = top;
+    g->rows = left;
+    g->cols  = top;
     gint len = g->frames->len;
     g_ptr_array_set_size(g->frames, left * top);
-    for (int t = 1; t <= top; t++)
-        for (int l = 1; l <= left; l++)
+    for (gint t = 1; t <= top; t++)
+        for (gint l = 1; l <= left; l++)
         {
             gint idx = grid_index_by_pos(g, l, t);
             if (idx >= len)
-                g_ptr_array_add(g->frames, gtk_frame_new(NULL));
+            {
+                GtkFrame* n = gtk_frame_new(NULL);
+                GtkImage* i = gtk_image_new();
+            }
             GtkFrame* f = (GtkFrame*)g_ptr_array_index(g->frames, idx);
             GtkFrame* c = (GtkFrame*)gtk_grid_get_child_at(g->grid, l, t);
             if (f != c)
+            {
+                if (c)
+                    gtk_container_remove(GTK_CONTAINER(g->grid), (GtkWidget*)c);
                 gtk_grid_attach(g->grid, (GtkWidget*)f, l, t, 1, 1);
+            }
         }
+    gtk_widget_show_all((GtkWidget*)g->grid);
     return 0;
 }
-
 static int get_name_gridL(lua_State *L)
 {
     CHECK_ARGS;
@@ -101,7 +100,6 @@ static int get_name_gridL(lua_State *L)
     lua_pushstring(L, name);
     return 1;
 }
-
 static int set_name_gridL(lua_State *L)
 {
     CHECK_ARGS;
@@ -109,7 +107,6 @@ static int set_name_gridL(lua_State *L)
     gtk_widget_set_name((GtkWidget*)frame, name);
     return 0;
 }
-
 static int get_label_gridL(lua_State *L)
 {
     CHECK_ARGS;
@@ -118,7 +115,6 @@ static int get_label_gridL(lua_State *L)
         lua_pushstring(L, label);
     return 1;
 }
-
 static int set_label_gridL(lua_State *L)
 {
     CHECK_ARGS;
@@ -126,50 +122,49 @@ static int set_label_gridL(lua_State *L)
     gtk_frame_set_label(frame, label);
     return 0;
 }
-
-static int get_gridL(lua_State *L)
+static int clear_gridL(lua_State *L)
 {
     CHECK_ARGS;
-    lua_pushlightuserdata(L, (void*)frame);
-    lua_gettable(L, LUA_REGISTRYINDEX);
-    return 1;
+    GtkImage* image = (GtkImage*)gtk_bin_get_child(frame);
+    gtk_image_clear(image);
+    gtk_widget_show_all((GtkWidget*)frame);
+    return 0;
 }
-
-static int set_gridL(lua_State *L)
+static int load_gridL(lua_State *L)
 {
     CHECK_ARGS;
-    lua_pushlightuserdata(L, (void*)frame);
-    gtk_container_foreach(GTK_CONTAINER(frame), (GtkCallback)gtk_container_remove, frame);
-    if (!lua_isnil(L, 4))
-    {
-        imageL* i = (imageL*)luaL_checkudata(L, 4, UDATA_IMAGEL);
-        gtk_container_add(GTK_CONTAINER(frame), (GtkWidget*)i->image);
-    }
-    lua_pushvalue(L, 4);
-    lua_settable(L, LUA_REGISTRYINDEX);
+    imageL* i = (imageL*)luaL_checkudata(L, 4, UDATA_IMAGEL);
+    GtkImage* image = (GtkImage*)gtk_bin_get_child(frame);
+    GdkPixbuf* pxb = image_create_pixbuf(i);
+    gtk_image_set_from_pixbuf(image, pxb);
+    g_object_unref(pxb);
+    gtk_widget_show_all((GtkWidget*)frame);
     return 0;
 }
-
-static int show_gridL(lua_State *L)
-{
-    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
-    show_widget((GtkWidget*)g->grid);
-    return 0;
-}
-
 
 static int gc_gridL(lua_State *L)
 {
     gridL *g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
     g_ptr_array_free(g->frames, TRUE);
+    g_object_unref(g->grid);
     gtk_widget_destroy((GtkWidget*)g->grid);
     return 0;
 }
-
 static int index_gridL(lua_State *L)
 {
     gridL *g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
     const gchar* field = luaL_checkstring(L, 2);
+
+    CASE_FUNC(L, field, "get",       UDATA_GRIDL);
+    CASE_FUNC(L, field, "set",       UDATA_GRIDL);
+    CASE_FUNC(L, field, "get_name",  UDATA_GRIDL);
+    CASE_FUNC(L, field, "set_name",  UDATA_GRIDL);
+    CASE_FUNC(L, field, "get_size",  UDATA_GRIDL);
+    CASE_FUNC(L, field, "set_size",  UDATA_GRIDL);
+    CASE_FUNC(L, field, "get_label", UDATA_GRIDL);
+    CASE_FUNC(L, field, "set_label", UDATA_GRIDL);
+    CASE_FUNC(L, field, "load",      UDATA_GRIDL);
+    CASE_FUNC(L, field, "clear",     UDATA_GRIDL);
     if (g_strcmp0(field, "spacing") == 0)
     {
         lua_newtable(L);
@@ -178,29 +173,8 @@ static int index_gridL(lua_State *L)
         lua_pushnumber(L, gtk_grid_get_column_spacing(g->grid));
         lua_setfield(L, -2, "column");
     }
-    else if (g_strcmp0(field, "get_name") == 0)
-        lua_pushcfunction(L, get_name_gridL);
-    else if (g_strcmp0(field, "set_name") == 0)
-        lua_pushcfunction(L, set_name_gridL);
-    else if (g_strcmp0(field, "get_label") == 0)
-        lua_pushcfunction(L, get_label_gridL);
-    else if (g_strcmp0(field, "set_label") == 0)
-        lua_pushcfunction(L, set_label_gridL);
-    else if (g_strcmp0(field, "get") == 0)
-        lua_pushcfunction(L, get_gridL);
-    else if (g_strcmp0(field, "set") == 0)
-        lua_pushcfunction(L, set_gridL);
-    else if (g_strcmp0(field, "get_size") == 0)
-        lua_pushcfunction(L, get_size_gridL);
-    else if (g_strcmp0(field, "set_size") == 0)
-        lua_pushcfunction(L, set_size_gridL);
-    else if (g_strcmp0(field, "show") == 0)
-        lua_pushcfunction(L, show_gridL);
-    else
-        lua_pushnil(L);
     return 1;
 }
-
 static int newindex_gridL(lua_State *L)
 {
     gridL *g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
@@ -233,7 +207,6 @@ static const struct luaL_Reg gridLlib_f [] =
     {"new", new_gridL},
     {NULL,  NULL     }
 };
-
 static const struct luaL_Reg gridLlib_m [] =
 {
     {"__gc",       gc_gridL      },
@@ -241,7 +214,6 @@ static const struct luaL_Reg gridLlib_m [] =
     {"__newindex", newindex_gridL},
     {NULL,         NULL          }
 };
-
 int luaopen_gridL(lua_State *L, const gchar* name)
 {
     luaL_newmetatable(L, UDATA_GRIDL);
@@ -249,4 +221,3 @@ int luaopen_gridL(lua_State *L, const gchar* name)
     luaL_newlib(L, gridLlib_f, name);
     return 1;
 }
-

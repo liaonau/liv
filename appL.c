@@ -12,7 +12,6 @@ static int quit_appL(lua_State *L)
         exit(0);
     return 0;
 }
-
 static int resize_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -22,7 +21,6 @@ static int resize_appL(lua_State *L)
         gtk_window_resize(window, w, h);
     return 0;
 }
-
 static int content_size_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -32,7 +30,6 @@ static int content_size_appL(lua_State *L)
     lua_pushnumber(L, alloc.height);
     return 2;
 }
-
 static int window_size_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -42,7 +39,6 @@ static int window_size_appL(lua_State *L)
     lua_pushnumber(L, h);
     return 2;
 }
-
 static int style_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -59,7 +55,45 @@ static int style_appL(lua_State *L)
     g_object_unref(provider);
     return 0;
 }
-
+static int display_appL(lua_State *L)
+{
+    luaL_checkudata(L, 1, UDATA_APPL);
+    gpointer data = lua_touserdata(L, 2);
+    GtkWidget* to_display;
+    GtkWidget* child = gtk_bin_get_child(GTK_BIN(content));
+    if (data == NULL)
+        to_display = NULL;
+    else
+    {
+        lua_getmetatable(L, 2);
+        luaL_getmetatable(L, UDATA_SCROLLL);
+        luaL_getmetatable(L, UDATA_GRIDL);
+        if (lua_equal(L, -3, -1))
+            to_display = (GtkWidget*)((gridL*)data->grid);
+        else if (lua_equal(L, -3, -2))
+            to_display = (GtkWidget*)((scrollL*)data->scroll);
+        else
+            to_display = NULL;
+    }
+    if (child && child != to_display)
+        gtk_container_remove(GTK_CONTAINER(content), child);
+    if (to_display)
+        gtk_container_add(GTK_CONTAINER(content), to_display);
+    gtk_widget_show_all((GtkWidget*)content);
+    return 0;
+}
+static int mode_appL(lua_State *L)
+{
+    luaL_checkudata(L, 1, UDATA_APPL);
+    GtkWidget* child = gtk_bin_get_child(GTK_BIN(content));
+    if (GTK_IS_GRID(child))
+        lua_pushstring(L, LIB_GRIDL);
+    else if (GTK_IS_SCROLLED_WINDOW(child))
+        lua_pushstring(L, LIB_SCROLLL);
+    else
+        lua_pushnil(L);
+    return 1;
+}
 
 static int index_appL(lua_State *L)
 {
@@ -88,11 +122,14 @@ static int index_appL(lua_State *L)
         lua_pushcfunction(L, quit_appL);
     else if (g_strcmp0(field, "style") == 0)
         lua_pushcfunction(L, style_appL);
+    else if (g_strcmp0(field, "display") == 0)
+        lua_pushcfunction(L, display_appL);
+    else if (g_strcmp0(field, "mode") == 0)
+        lua_pushcfunction(L, mode_appL);
     else
         lua_pushnil(L);
     return 1;
 }
-
 static int newindex_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
@@ -119,14 +156,12 @@ static int newindex_appL(lua_State *L)
     }
     return 0;
 }
-
 static int tostring_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
     lua_pushstring(L, APPNAME);
     return 1;
 }
-
 static const struct luaL_Reg appLlib_m [] =
 {
     {"__tostring", tostring_appL},
@@ -134,7 +169,6 @@ static const struct luaL_Reg appLlib_m [] =
     {"__newindex", newindex_appL},
     {NULL,         NULL         }
 };
-
 int luaopen_appL(lua_State *L, const gchar* name)
 {
     lua_newuserdata(L, sizeof(appL));
@@ -144,4 +178,3 @@ int luaopen_appL(lua_State *L, const gchar* name)
     lua_setglobal(L, name);
     return 1;
 }
-

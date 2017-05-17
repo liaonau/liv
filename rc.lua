@@ -1,44 +1,3 @@
---{{{ глобальные переменные
-images  = {}
-picture = scroll.new()
-preview = grid.new()
-marks   = {}
-
-thumbs = {}
-thumbs.min  = 16
-thumbs.max  = 256
-thumbs.size = 128
-thumbs.step = 16
-images.scroll_step = 10
-images.zoom_step   = 20
-images.zoom_mul    = 1.2
-default_constraints = {min = 32, max = 2000}
-
-
-state =
-{
-    preview = true,
-    idx     = 1,
-    update  = true,
-    labels  = {index = false, path = false},
-    size    = {window = nil, content = nil},
-}
-
-setmetatable(_G,
-{
-    __index = function(t, k)
-        if (k == 'IMG') then
-            return images[state.idx]
-        end
-    end,
-})
-
-local function round(num, pow)--{{{
-    local p = 10^(pow or 0)
-    return math.floor(num * p + 0.5) / p
-end
---}}}
---}}}
 --{{{ css: CSS для Gtk3
 local css =
 [===[
@@ -71,6 +30,87 @@ local css =
 }
 ]===]
 --}}}
+--{{{ глобальные переменные
+images  = {}
+picture = scroll.new()
+preview = grid.new()
+marks   = {}
+
+images.scroll_step = 10
+images.zoom_step   = 20
+images.zoom_mul    = 1.2
+default_constraints =
+{
+    min = 32,
+    max = 2000,
+}
+
+state =
+{
+    preview = true,
+    idx     = 1,
+    update  = true,
+    labels  = {index = false, path = false},
+    size    = {window = nil, content = nil},
+}
+
+setmetatable(_G,
+{
+    __index = function(t, k)
+        if (k == 'IMG') then
+            return images[state.idx]
+        end
+    end,
+})
+
+local function round(num, pow)--{{{
+    local p = 10^(pow or 0)
+    return math.floor(num * p + 0.5) / p
+end
+--}}}
+--}}}
+--{{{{{{ thumbs: предпросмотр
+thumbs =
+{
+min  = 16,
+max  = 256,
+size = 128,
+step = 16,
+max_alloc = function()--{{{
+    local maxalloc = {width = 0, height = 0}
+    for idx, t in ipairs(thumbs) do
+        local alloc = t.allocation
+        maxalloc.width  = math.max(maxalloc.width,  alloc.width)
+        maxalloc.height = math.max(maxalloc.height, alloc.height)
+    end
+    return maxalloc
+end,
+--}}}
+max_size = function()--{{{
+    local size = 0
+    for idx, t in ipairs(thumbs) do
+        local w, h = dims.native_size(t);
+        size = math.max(size, math.max(w, h))
+    end
+    return size
+end,
+--}}}
+pos_by_idx = function(idx)--{{{
+    local constrain = preview.size.left
+    if (constrain < 1) then
+        constrain = 1
+    end
+    local left = (idx - 1   ) % constrain + 1
+    local top  = (idx - left) / constrain + 1
+    return left, top
+end,
+--}}}
+idx_by_pos = function(left, top)--{{{
+    return (top - 1) * preview.size.left + left
+end,
+--}}}
+}
+--}}}}}}
 --{{{ init
 init = function(...)
     app.title = 'liv'
@@ -82,6 +122,7 @@ init = function(...)
         table.insert(images, i)
         marks[i] = false
     end
+    --IMG:load()
     navigator.first()
 
     --local size = thumbs.max_size()
@@ -94,45 +135,10 @@ init = function(...)
     --else
         --viewer.show_preview()
     --end
-    texter.set_title()
-    texter.set_status()
+    --texter.set_title()
+    --texter.set_status()
 end
 --}}}
---{{{{{{ thumbs: вспомогательные функции
-thumbs.max_alloc = function()--{{{
-    local maxalloc = {width = 0, height = 0}
-    for idx, t in ipairs(thumbs) do
-        local alloc = t.allocation
-        maxalloc.width  = math.max(maxalloc.width,  alloc.width)
-        maxalloc.height = math.max(maxalloc.height, alloc.height)
-    end
-    return maxalloc
-end
---}}}
-thumbs.max_size = function()--{{{
-    local size = 0
-    for idx, t in ipairs(thumbs) do
-        local w, h = dims.native_size(t);
-        size = math.max(size, math.max(w, h))
-    end
-    return size
-end
---}}}
-thumbs.pos_by_idx = function(idx)--{{{
-    local constrain = preview.size.left
-    if (constrain < 1) then
-        constrain = 1
-    end
-    local left = (idx - 1   ) % constrain + 1
-    local top  = (idx - left) / constrain + 1
-    return left, top
-end
---}}}
-thumbs.idx_by_pos = function(left, top)--{{{
-    return (top - 1) * preview.size.left + left
-end
---}}}
---}}}}}}
 --{{{ mkup: pango markup
 mkup =
 {
@@ -283,12 +289,15 @@ set = function(idx) --{{{
 
     --marker.swap(old, idx)
 
+    --picture:clear()
+    --IMG:unload()
     state.idx = idx
     --if (state.preview) then
         --scroller.preview_adjust_to_current()
     --end
+    --IMG:load()
     picture.image = IMG
-    texter.set_title()
+    --texter.set_title()
 end,
 --}}}
 move = function(shift)--{{{

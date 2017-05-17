@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-/* Print error and exit with EXIT_FAILURE code. */
 void _fatal(gint line, const gchar *fct, const gchar *fmt, ...)
 {
     va_list ap;
@@ -20,8 +19,6 @@ void _fatal(gint line, const gchar *fct, const gchar *fmt, ...)
     g_fprintf(stderr, "\n");
     exit(EXIT_FAILURE);
 }
-
-/* Print error message on stderr. */
 void _warn(gint line, const gchar *fct, const gchar *fmt, ...)
 {
     va_list ap;
@@ -34,7 +31,6 @@ void _warn(gint line, const gchar *fct, const gchar *fmt, ...)
     if (atty) g_fprintf(stderr, ANSI_COLOR_RESET);
     g_fprintf(stderr, "\n");
 }
-
 void _info(gint line, const gchar *fct, const gchar *fmt, ...)
 {
     va_list ap;
@@ -47,4 +43,3 @@ void _info(gint line, const gchar *fct, const gchar *fmt, ...)
     if (atty) g_fprintf(stderr, ANSI_COLOR_RESET);
     g_fprintf(stderr, "\n");
 }
-

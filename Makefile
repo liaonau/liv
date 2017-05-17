@@ -3,9 +3,9 @@ NAME=liv
 PKGS = gtk+-3.0 lua
 
 INCS    := $(shell pkg-config --cflags $(PKGS)) -I./
-CFLAGS  := -std=gnu11 -ggdb -W -Wall -Wextra $(INCS) $(CFLAGS) -Wno-unused-parameter
+CFLAGS  := -std=gnu11 -ggdb -W -Wall -Wextra -Wno-unused-parameter $(INCS) $(CFLAGS)
 LIBS    += $(shell pkg-config --libs $(PKGS))
-LDFLAGS := $(LIBS) $(LDFLAGS) -Wl,--export-dynamic
+LDFLAGS := -Wl,--export-dynamic $(LIBS) $(LDFLAGS)
 
 SRCS = $(wildcard *.c)
 HEADS = $(wildcard *.h)

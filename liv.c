@@ -22,7 +22,6 @@ static gboolean luaH_init(void)
     luaopen_appL(L, LIB_APPL);
     return TRUE;
 }
-
 static int luaH_traceback(lua_State *L)
 {
     lua_getglobal(L, "debug");
@@ -33,7 +32,6 @@ static int luaH_traceback(lua_State *L)
     lua_call(L, 2, 1);
     return 1;
 }
-
 static void luaH_pcall(lua_State *L, int nargs, int nresults)
 {
     lua_pushcfunction(L, luaH_traceback);
@@ -47,7 +45,6 @@ static void luaH_pcall(lua_State *L, int nargs, int nresults)
     }
     lua_remove(L, error_func_pos);
 }
-
 static gboolean luaH_loadrc(gchar* confpath)
 {
     const gchar* const *config_dirs = g_get_system_config_dirs();
@@ -102,7 +99,6 @@ static void cb_size(GtkWidget *widget, GdkRectangle *rect, gpointer data)
     }
     lua_settop(L, top);
 }
-
 static void cb_key(GtkWidget *widget, GdkEventKey *ev, gpointer user_data)
 {
     if (ev->type != GDK_KEY_PRESS || ev->is_modifier == 1)
@@ -180,9 +176,13 @@ gint main(gint argc, gchar **argv)
     gtk_window_set_title(GTK_WINDOW(window), APPNAME);
     gtk_widget_set_name((GtkWidget*)window, "window");
 
+    GtkBox* mainbox;
     mainbox   = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
-    content   = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
+    content   = (GtkBox*)gtk_frame_new(NULL);
     statusbox = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_frame_set_shadow_type(content, GTK_SHADOW_NONE);
+    gtk_widget_set_hexpand((GtkWidget*)content, TRUE);
+    gtk_widget_set_vexpand((GtkWidget*)content, TRUE);
     gtk_widget_set_name((GtkWidget*)content,   "content");
     gtk_widget_set_name((GtkWidget*)statusbox, "status");
     gtk_box_pack_start(mainbox, (GtkWidget*)content,   TRUE,  TRUE,  0);
@@ -223,4 +223,3 @@ gint main(gint argc, gchar **argv)
 
     return 0;
 }
-
