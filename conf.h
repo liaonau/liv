@@ -39,7 +39,6 @@ typedef struct scrollL
 scrollL;
 typedef struct imageL
 {
-    gchar*     path;
     GdkPixbuf* pxb;
     guint8     state;
     gint       width;

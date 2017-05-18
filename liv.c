@@ -178,7 +178,7 @@ gint main(gint argc, gchar **argv)
 
     GtkBox* mainbox;
     mainbox   = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
-    content   = (GtkBox*)gtk_frame_new(NULL);
+    content   = (GtkFrame*)gtk_frame_new(NULL);
     statusbox = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_frame_set_shadow_type(content, GTK_SHADOW_NONE);
     gtk_widget_set_hexpand((GtkWidget*)content, TRUE);

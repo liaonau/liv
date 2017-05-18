@@ -22,7 +22,7 @@ static inline void state_change(imageL* i, guint8 action)
 {
     i->state = states[action][i->state];
 }
-static inline void scale_change(imageL* i, gint width, gint heigth)
+static inline void scale_change(imageL* i, gint width, gint height)
 {
     i->width  = MAX(1, width);
     i->height = MAX(1, height);
@@ -30,7 +30,7 @@ static inline void scale_change(imageL* i, gint width, gint heigth)
 
 static inline gboolean image_is_swapped(imageL* i)
 {
-    return (image->state % 2);
+    return (i->state % 2);
 }
 static inline gboolean image_is_broken(imageL* i)
 {
@@ -45,7 +45,7 @@ GdkPixbuf* image_create_pixbuf(imageL* i)
     gint w = gdk_pixbuf_get_width(i->pxb);
     gint h = gdk_pixbuf_get_height(i->pxb);
     if (w != i->width || h != i->height)
-        scaledpxb = gdk_pixbuf_scale_simple(i->pxb, width, height, GDK_INTERP_BILINEAR);
+        scaledpxb = gdk_pixbuf_scale_simple(i->pxb, i->width, i->height, GDK_INTERP_BILINEAR);
     else
     {
         scaledpxb = i->pxb;
@@ -91,8 +91,7 @@ static int new_imageL(lua_State *L)
 {
     imageL* i = (imageL*)lua_newuserdata(L, sizeof(imageL));
     const gchar* path = luaL_checkstring(L, 1);
-    i->path = g_strdup(path);
-    i->pxb  = gdk_pixbuf_new_from_file(i->path, NULL);
+    i->pxb  = gdk_pixbuf_new_from_file(path, NULL);
     if (!GDK_IS_PIXBUF(i->pxb))
     {
         g_object_ref(BROKENpxb);
@@ -107,10 +106,7 @@ static int new_imageL(lua_State *L)
 static int rotate_imageL(lua_State* L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
-    GdkPixbufRotation rotation = GDK_PIXBUF_ROTATE_CLOCKWISE;
     gboolean clockwise = lua_toboolean(L, 2);
-    if (!clockwise)
-        rotation = GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE;
 
     guint8 action = (clockwise ? 1 : 3);
     state_change(i, action);
@@ -154,34 +150,26 @@ static int gc_imageL(lua_State *L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
     g_object_unref(i->pxb);
-    g_free(i->path);
     return 0;
-}
-static int tostring_imageL(lua_State *L)
-{
-    imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
-    lua_pushstring(L, i->path);
-    return 1;
 }
 static int index_imageL(lua_State *L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
     const gchar* field = luaL_checkstring(L, 2);
 
-    CASE_STR( L, field, "path",          i->path);
-    CASE_NUM( L, field, "width",         i->width);
-    CASE_NUM( L, field, "height",        i->height);
-    CASE_NUM( L, field, "native_width",  gdk_pixbuf_get_width(i->pxb));
-    CASE_NUM( L, field, "native_height", gdk_pixbuf_get_height(i->pxb));
-    CASE_NUM( L, field, "state",         i->state);
-    CASE_BOOL(L, field, "swapped",       image_is_swapped(i));
-    CASE_BOOL(L, field, "broken",        image_is_broken(i));
+    CASE_NUM( L, field, width,         i->width);
+    CASE_NUM( L, field, height,        i->height);
+    CASE_NUM( L, field, native_width,  gdk_pixbuf_get_width(i->pxb));
+    CASE_NUM( L, field, native_height, gdk_pixbuf_get_height(i->pxb));
+    CASE_NUM( L, field, state,         i->state);
+    CASE_BOOL(L, field, swapped,       image_is_swapped(i));
+    CASE_BOOL(L, field, broken,        image_is_broken(i));
 
-    CASE_FUNC(L, field, "rotate",    UDATA_IMAGEL);
-    CASE_FUNC(L, field, "flip",      UDATA_IMAGEL);
-    CASE_FUNC(L, field, "set_state", UDATA_IMAGEL);
-    CASE_FUNC(L, field, "scale",     UDATA_IMAGEL);
-    CASE_FUNC(L, field, "reset",     UDATA_IMAGEL);
+    CASE_FUNC(L, field, rotate,    image);
+    CASE_FUNC(L, field, flip,      image);
+    CASE_FUNC(L, field, set_state, image);
+    CASE_FUNC(L, field, scale,     image);
+    CASE_FUNC(L, field, reset,     image);
 
     return 1;
 }
@@ -194,7 +182,6 @@ static const struct luaL_Reg imageLlib_f [] =
 static const struct luaL_Reg imageLlib_m [] =
 {
     {"__gc",       gc_imageL      },
-    {"__tostring", tostring_imageL},
     {"__index",    index_imageL   },
     {NULL,         NULL           }
 };

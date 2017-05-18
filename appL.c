@@ -69,9 +69,9 @@ static int display_appL(lua_State *L)
         luaL_getmetatable(L, UDATA_SCROLLL);
         luaL_getmetatable(L, UDATA_GRIDL);
         if (lua_equal(L, -3, -1))
-            to_display = (GtkWidget*)((gridL*)data->grid);
+            to_display = (GtkWidget*)(((gridL*)(data))->grid);
         else if (lua_equal(L, -3, -2))
-            to_display = (GtkWidget*)((scrollL*)data->scroll);
+            to_display = (GtkWidget*)(((scrollL*)(data))->scroll);
         else
             to_display = NULL;
     }

@@ -83,13 +83,14 @@ static int gc_scrollL(lua_State *L)
 }
 static int index_scrollL(lua_State *L)
 {
-    scrollL *s = (scrollL*)luaL_checkudata(L, 1, UDATA_SCROLLL);
+    /*scrollL *s = (scrollL*)luaL_checkudata(L, 1, UDATA_SCROLLL);*/
+    luaL_checkudata(L, 1, UDATA_SCROLLL);
     const gchar* field = luaL_checkstring(L, 2);
 
-    CASE_FUNC(L, field, "get_scroll", UDATA_SCROLLL);
-    CASE_FUNC(L, field, "set_scroll", UDATA_SCROLLL);
-    CASE_FUNC(L, field, "load",       UDATA_SCROLLL);
-    CASE_FUNC(L, field, "clear",      UDATA_SCROLLL);
+    CASE_FUNC(L, field, get_scroll, scroll);
+    CASE_FUNC(L, field, set_scroll, scroll);
+    CASE_FUNC(L, field, load,       scroll);
+    CASE_FUNC(L, field, clear,      scroll);
     return 1;
 }
 
@@ -102,7 +103,6 @@ static const struct luaL_Reg scrollLlib_m [] =
 {
     {"__gc",       gc_scrollL      },
     {"__index",    index_scrollL   },
-    {"__newindex", newindex_scrollL},
     {NULL,         NULL            }
 };
 int luaopen_scrollL(lua_State *L, const gchar* name)

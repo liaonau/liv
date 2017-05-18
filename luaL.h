@@ -24,28 +24,28 @@
 
 
 #define CASE_FUNC(L, field, name, udatatype) \
-    if (g_strcmp0((field), (name)) == 0) \
+    if (g_strcmp0((field), #name) == 0) \
     { \
-        lua_pushcfunction((L), name##_##udatatype); \
+        lua_pushcfunction((L), name##_##udatatype##L); \
         return 1; \
     } \
 
 #define CASE_NUM(L, field, name, value) \
-    if (g_strcmp0((field), (name)) == 0) \
+    if (g_strcmp0((field), #name) == 0) \
     { \
         lua_pushnumber((L), (value)); \
         return 1; \
     } \
 
 #define CASE_BOOL(L, field, name, value) \
-    if (g_strcmp0((field), (name)) == 0) \
+    if (g_strcmp0((field), #name) == 0) \
     { \
         lua_pushboolean((L), (value)); \
         return 1; \
     } \
 
 #define CASE_STR(L, field, name, value) \
-    if (g_strcmp0((field), (name)) == 0) \
+    if (g_strcmp0((field), #name) == 0) \
     { \
         lua_pushboolean((L), (value)); \
         return 1; \

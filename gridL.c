@@ -14,9 +14,7 @@
 
 static void frame_free(gpointer data)
 {
-    GtkFrame*  frame = (GtkFrame*)data;
-    GtkWidget* image = gtk_bin_get_child(frame);
-    gtk_widget_destroy((GtkWidget*)frame);
+    gtk_widget_destroy((GtkWidget*)data);
 }
 
 static inline gint grid_index_by_pos(gridL* g, gint left, gint top)
@@ -78,8 +76,11 @@ static int set_size_gridL(lua_State *L)
             gint idx = grid_index_by_pos(g, l, t);
             if (idx >= len)
             {
-                GtkFrame* n = gtk_frame_new(NULL);
-                GtkImage* i = gtk_image_new();
+                GtkWidget* n = gtk_frame_new(NULL);
+                GtkWidget* i = gtk_image_new();
+                gtk_container_add(GTK_CONTAINER(n), i);
+                g_ptr_array_add(g->frames, n);
+
             }
             GtkFrame* f = (GtkFrame*)g_ptr_array_index(g->frames, idx);
             GtkFrame* c = (GtkFrame*)gtk_grid_get_child_at(g->grid, l, t);
@@ -125,7 +126,7 @@ static int set_label_gridL(lua_State *L)
 static int clear_gridL(lua_State *L)
 {
     CHECK_ARGS;
-    GtkImage* image = (GtkImage*)gtk_bin_get_child(frame);
+    GtkImage* image = (GtkImage*)gtk_bin_get_child(GTK_BIN(frame));
     gtk_image_clear(image);
     gtk_widget_show_all((GtkWidget*)frame);
     return 0;
@@ -134,7 +135,7 @@ static int load_gridL(lua_State *L)
 {
     CHECK_ARGS;
     imageL* i = (imageL*)luaL_checkudata(L, 4, UDATA_IMAGEL);
-    GtkImage* image = (GtkImage*)gtk_bin_get_child(frame);
+    GtkImage* image = (GtkImage*)gtk_bin_get_child(GTK_BIN(frame));
     GdkPixbuf* pxb = image_create_pixbuf(i);
     gtk_image_set_from_pixbuf(image, pxb);
     g_object_unref(pxb);
@@ -155,16 +156,14 @@ static int index_gridL(lua_State *L)
     gridL *g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
     const gchar* field = luaL_checkstring(L, 2);
 
-    CASE_FUNC(L, field, "get",       UDATA_GRIDL);
-    CASE_FUNC(L, field, "set",       UDATA_GRIDL);
-    CASE_FUNC(L, field, "get_name",  UDATA_GRIDL);
-    CASE_FUNC(L, field, "set_name",  UDATA_GRIDL);
-    CASE_FUNC(L, field, "get_size",  UDATA_GRIDL);
-    CASE_FUNC(L, field, "set_size",  UDATA_GRIDL);
-    CASE_FUNC(L, field, "get_label", UDATA_GRIDL);
-    CASE_FUNC(L, field, "set_label", UDATA_GRIDL);
-    CASE_FUNC(L, field, "load",      UDATA_GRIDL);
-    CASE_FUNC(L, field, "clear",     UDATA_GRIDL);
+    CASE_FUNC(L, field, load,      grid);
+    CASE_FUNC(L, field, clear,     grid);
+    CASE_FUNC(L, field, get_name,  grid);
+    CASE_FUNC(L, field, set_name,  grid);
+    CASE_FUNC(L, field, get_size,  grid);
+    CASE_FUNC(L, field, set_size,  grid);
+    CASE_FUNC(L, field, get_label, grid);
+    CASE_FUNC(L, field, set_label, grid);
     if (g_strcmp0(field, "spacing") == 0)
     {
         lua_newtable(L);

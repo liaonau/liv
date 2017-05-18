@@ -31,6 +31,7 @@ local css =
 ]===]
 --}}}
 --{{{ глобальные переменные
+files   = {}
 images  = {}
 picture = scroll.new()
 preview = grid.new()
@@ -117,8 +118,8 @@ init = function(...)
     app:style(css)
     args = {...}
     for n, path in ipairs(args) do
+        table.insert(files, path)
         local i = image.new(path)
-        i:load()
         table.insert(images, i)
         marks[i] = false
     end
@@ -296,7 +297,7 @@ set = function(idx) --{{{
         --scroller.preview_adjust_to_current()
     --end
     --IMG:load()
-    picture.image = IMG
+    picture:load(IMG)
     --texter.set_title()
 end,
 --}}}
