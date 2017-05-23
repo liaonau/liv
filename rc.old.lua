@@ -1,46 +1,3 @@
---{{{ глобальные переменные
-files   = {}
-images  = {}
-thumbs  = {}
-marks   = {}
-frame   = grid.new('frame')
-preview = grid.new('preview')
-
-thumbs.min  = 16
-thumbs.max  = 256
-thumbs.size = 128
-thumbs.step = 16
-images.scroll_step = 10
-images.zoom_step   = 20
-images.zoom_mul    = 1.2
-default_constraints = {min = 32, max = 2000}
-
-
-state =
-{
-    preview = true,
-    idx     = 1,
-    update  = true,
-    labels  = {index = false, path = false},
-    appsize = nil,
-
-}
-
-setmetatable(_G,
-{
-    __index = function(t, k)
-        if (k == 'IMG') then
-            return images[state.idx]
-        end
-    end,
-})
-
-local function round(num, pow)--{{{
-    local p = 10^(pow or 0)
-    return math.floor(num * p + 0.5) / p
-end
---}}}
---}}}
 --{{{ css: CSS для Gtk3
 local css =
 [===[
@@ -73,6 +30,87 @@ local css =
 }
 ]===]
 --}}}
+--{{{ глобальные переменные
+files   = {}
+images  = {}
+picture = scroll.new()
+preview = grid.new()
+marks   = {}
+
+images.scroll_step = 10
+images.zoom_step   = 20
+images.zoom_mul    = 1.2
+default_constraints =
+{
+    min = 32,
+    max = 2000,
+}
+
+state =
+{
+    preview = true,
+    idx     = 1,
+    labels  = {index = false, path = false},
+    size    = {window = nil, content = nil},
+}
+
+setmetatable(_G,
+{
+    __index = function(t, k)
+        if (k == 'IMG') then
+            return images[state.idx]
+        end
+    end,
+})
+
+local function round(num, pow)--{{{
+    local p = 10^(pow or 0)
+    return math.floor(num * p + 0.5) / p
+end
+--}}}
+--}}}
+--{{{{{{ thumbs: предпросмотр
+thumbs =
+{
+min  = 16,
+max  = 256,
+size = 128,
+step = 16,
+max_alloc = function()--{{{
+    local maxalloc = {width = 0, height = 0}
+    for idx, t in ipairs(thumbs) do
+        local alloc = t.allocation
+        maxalloc.width  = math.max(maxalloc.width,  alloc.width)
+        maxalloc.height = math.max(maxalloc.height, alloc.height)
+    end
+    return maxalloc
+end,
+--}}}
+max_size = function()--{{{
+    local size = 0
+    for idx, t in ipairs(thumbs) do
+        local w, h = dims.native_size(t);
+        size = math.max(size, math.max(w, h))
+    end
+    return size
+end,
+--}}}
+pos_by_idx = function(idx)--{{{
+    local constrain = preview.size.left
+    if (constrain < 1) then
+        constrain = 1
+    end
+    local left = (idx - 1   ) % constrain + 1
+    local top  = (idx - left) / constrain + 1
+    return left, top
+end,
+--}}}
+idx_by_pos = function(left, top)--{{{
+    return (top - 1) * preview.size.left + left
+end,
+--}}}
+}
+--}}}}}}
 --{{{ init
 init = function(...)
     app.title = 'liv'
@@ -81,65 +119,26 @@ init = function(...)
     for n, path in ipairs(args) do
         table.insert(files, path)
         local i = image.new(path)
-        local t = image.new(path)
         table.insert(images, i)
-        table.insert(thumbs, t)
-        table.insert(marks, false)
-        i.name = 'image'
-        t.name = 'thumb'
-        t.label = nil
+        marks[i] = false
     end
+    --IMG:load()
     navigator.first()
 
-    local size = thumbs.max_size()
-    size = math.min(thumbs.max, math.max(thumbs.min, size))
-    thumbs.size = math.min(thumbs.size, size)
-    resizer.thumbs(thumbs.size)
+    --local size = thumbs.max_size()
+    --size = math.min(thumbs.max, math.max(thumbs.min, size))
+    --thumbs.size = math.min(thumbs.size, size)
+    --resizer.thumbs(thumbs.size)
 
-    if (#files == 1) then
-        viewer.show_frame()
-    else
-        viewer.show_preview()
-    end
-    texter.set_title()
-    texter.set_status()
+    --if (#images == 1) then
+        viewer.show_picture()
+    --else
+        --viewer.show_preview()
+    --end
+    --texter.set_title()
+    --texter.set_status()
 end
 --}}}
---{{{{{{ thumbs: вспомогательные функции
-thumbs.max_alloc = function()--{{{
-    local maxalloc = {width = 0, height = 0}
-    for idx, t in ipairs(thumbs) do
-        local alloc = t.allocation
-        maxalloc.width  = math.max(maxalloc.width,  alloc.width)
-        maxalloc.height = math.max(maxalloc.height, alloc.height)
-    end
-    return maxalloc
-end
---}}}
-thumbs.max_size = function()--{{{
-    local size = 0
-    for idx, t in ipairs(thumbs) do
-        local w, h = dims.native_size(t);
-        size = math.max(size, math.max(w, h))
-    end
-    return size
-end
---}}}
-thumbs.pos_by_idx = function(idx)--{{{
-    local constrain = preview.size.left
-    if (constrain < 1) then
-        constrain = 1
-    end
-    local left = (idx - 1   ) % constrain + 1
-    local top  = (idx - left) / constrain + 1
-    return left, top
-end
---}}}
-thumbs.idx_by_pos = function(left, top)--{{{
-    return (top - 1) * preview.size.left + left
-end
---}}}
---}}}}}}
 --{{{ mkup: pango markup
 mkup =
 {
@@ -194,24 +193,24 @@ set_title = function() --{{{
 end,
 --}}}
 set_status = function() --{{{
-    local cond    = function(cond, s) return cond and s or '' end
-    local spc     = ' '
-    local w, h  = dims.size(IMG)
-    local W, H  = dims.native_size(IMG)
-    local z     = 100 * (w / W)
+    --local cond    = function(cond, s) return cond and s or '' end
+    --local spc     = ' '
+    --local w, h  = dims.size(IMG)
+    --local W, H  = dims.native_size(IMG)
+    --local z     = 100 * (w / W)
 
-    local mode  = mkup.m('mode:')..(state.preview and 'preview ['..thumbs.size..'px]' or 'frame')
-    local idx   = mkup.m('№:')..(IMG.broken and mkup.r(state.idx) or mkup.g(state.idx))..' of '..#files
-    local mkd   = cond(marks[state.idx], mkup.y('mark'));
-    local imgst = cond((not state.preview), mkup.m('state:')..texter.image_state_name(IMG))
+    --local mode  = mkup.m('mode:')..(state.preview and 'preview ['..thumbs.size..'px]' or 'picture')
+    --local idx   = mkup.m('№:')..(IMG.broken and mkup.r(state.idx) or mkup.g(state.idx))..' of '..#images
+    --local mkd   = cond(marks[state.idx], mkup.y('mark'));
+    --local imgst = cond((not state.preview), mkup.m('state:')..texter.image_state_name(IMG))
 
-    local pfx   = cond((steward.key_prefix ~= ''), mkup.m('prefix:')..mkup.y(steward.key_prefix))
-    local size  = cond((not IMG.broken), mkup.m('size:')..'['..W..'x'..H..']')
-    local pl, pt = thumbs.pos_by_idx(state.idx)
-    local pos   = cond(state.preview, mkup.m('grid:')..'('..pl..','..pt..')')
-    local scale = cond(not state.preview, mkup.m('scale:')..'['..w..'x'..h..'] '..round(z)..'%')
-    app.status_left  = mode..spc ..idx..spc ..mkd..spc ..size..spc ..imgst
-    app.status_right = pos..spc ..scale .. pfx
+    --local pfx   = cond((steward.key_prefix ~= ''), mkup.m('prefix:')..mkup.y(steward.key_prefix))
+    --local size  = cond((not IMG.broken), mkup.m('size:')..'['..W..'x'..H..']')
+    --local pl, pt = thumbs.pos_by_idx(state.idx)
+    --local pos   = cond(state.preview, mkup.m('grid:')..'('..pl..','..pt..')')
+    --local scale = cond(not state.preview, mkup.m('scale:')..'['..w..'x'..h..'] '..round(z)..'%')
+    --app.status_left  = mode..spc ..idx..spc ..mkd..spc ..size..spc ..imgst
+    --app.status_right = pos..spc ..scale .. pfx
 end,
 --}}}
 }
@@ -224,7 +223,7 @@ prev  = function() viewer.move(-1)     end,
 first = function() viewer.set("first") end,
 last  = function() viewer.set("last")  end,
 index = function(idx, strict)--{{{
-    local max = #files
+    local max = #images
     if (not strict) then
         idx = idx < 1   and 1   or idx
         idx = idx > max and max or idx
@@ -288,15 +287,17 @@ set = function(idx) --{{{
     idx = idx < 1   and 1   or idx
     idx = idx > max and max or idx
 
-    marker.swap(old, idx)
+    --marker.swap(old, idx)
 
+    --picture:clear()
+    --IMG:unload()
     state.idx = idx
-    if (state.preview) then
-        scroller.preview_adjust_to_current()
-    end
-    frame:clear()
-    frame:attach(IMG, 1, 1)
-    texter.set_title()
+    --if (state.preview) then
+        --scroller.preview_adjust_to_current()
+    --end
+    --IMG:load()
+    picture:load(IMG)
+    --texter.set_title()
 end,
 --}}}
 move = function(shift)--{{{
@@ -305,7 +306,7 @@ end,
 --}}}
 toggle_mode = function() --{{{
     state.preview = not state.preview
-    local g = state.preview and preview or frame
+    local g = state.preview and preview or picture
     if (state.update) then
         viewer.update[g]()
         state.update = false
@@ -318,7 +319,7 @@ show_preview = function()--{{{
     viewer.toggle_mode()
 end,
 --}}}
-show_frame = function() --{{{
+show_picture = function() --{{{
     state.preview = true
     viewer.toggle_mode()
 end,
@@ -352,7 +353,7 @@ end,
 --}}}
 update = --{{{
 {
-    [frame]   = function()
+    [picture]   = function()
     end,
     [preview] = function()
         viewer.fill_preview()
@@ -412,13 +413,13 @@ unset = function(idx)--{{{
 end,
 --}}}
 reset = function() --{{{
-    for idx, _ in ipairs(files) do
+    for idx, _ in ipairs(images) do
         marker.unset(idx)
     end
 end,
 --}}}
 reverse = function()--{{{
-    for idx, _ in ipairs(files) do
+    for idx, _ in ipairs(images) do
         marker.toggle(idx)
     end
 end,
@@ -429,7 +430,7 @@ current_only = function()--{{{
 end,
 --}}}
 print = function()--{{{
-    for idx, path in ipairs(files) do
+    for idx, path in ipairs(images) do
         if (marks[idx]) then
             print(path)
         end
@@ -592,12 +593,12 @@ end,
 --{{{{{{ scroller: скроллинг
 scroller =
 {
-frame = function(hor, ver) --{{{
+picture = function(hor, ver) --{{{
     app.hscroll = app.hscroll + app.max_hscroll * hor
     app.vscroll = app.vscroll + app.max_vscroll * ver
 end,
 --}}}
-frame_percent = function(hor, ver, absolute) --{{{
+picture_percent = function(hor, ver, absolute) --{{{
     local ch, ch
     if (absolute) then
         ch, cv = 0, 0
@@ -608,7 +609,7 @@ frame_percent = function(hor, ver, absolute) --{{{
     app.vscroll = cv + app.max_vscroll * ver / 100
 end,
 --}}}
-frame_center = function()--{{{
+picture_center = function()--{{{
     app.hscroll = 0.5 * (app.max_hscroll - app.width)
     app.vscroll = 0.5 * (app.max_vscroll - app.height)
 end,
@@ -658,12 +659,11 @@ end,
 ---}}}}}}
 test = function()
     --preview:clear()
-    --frame:clear()
+    --picture:clear()
     --thumbs = nil
     --images = nil
-    --files = nil
     --preview = nil
-    --frame = nil
+    --picture = nil
     collectgarbage()
 end
 --{{{{{{ steward: горячие клавиши
@@ -714,7 +714,7 @@ match = function(hotkey, name, mods)--{{{
 end,
 --}}}
 find = function(mods, name, value) --{{{
-    local specific = state.preview and "preview" or "frame"
+    local specific = state.preview and "preview" or "picture"
     for _, tab in pairs({"any", specific}) do
         for _, hotkey in ipairs(hotkeys[tab]) do
             if (steward.match(hotkey, name, mods)) then
@@ -762,7 +762,7 @@ hotkeys =
         {{         }, "b", function() app.status_visible = not app.status_visible end},
 
         {{         }, "g", prefixed(function(n) navigator.index(n,              true) end,  1)},
-        {{"Shift"  }, "g", prefixed(function(n) navigator.index(#files + 1 + n, true) end, -1)},
+        {{"Shift"  }, "g", prefixed(function(n) navigator.index(#images + 1 + n, true) end, -1)},
         {{"Shift"  }, "6",         function() navigator.first() end}, -- ^
         {{"Shift"  }, "4",         function() navigator.last()  end}, -- $
         {{         }, "space",     function() navigator.next()  end},
@@ -776,22 +776,22 @@ hotkeys =
         {{         }, "Return", function() viewer.toggle_mode() end},
     },
     --}}}
-    frame = --{{{
+    picture = --{{{
     {
         {{         }, "h", function() navigator.prev() end},
         {{         }, "j", function() navigator.next() end},
         {{         }, "k", function() navigator.prev() end},
         {{         }, "l", function() navigator.next() end},
 
-        {{         }, "Left",  prefixed(function(n) scroller.frame_percent(-n,  0) end, images.scroll_step)},
-        {{         }, "Right", prefixed(function(n) scroller.frame_percent( n,  0) end, images.scroll_step)},
-        {{         }, "Down",  prefixed(function(n) scroller.frame_percent( 0,  n) end, images.scroll_step)},
-        {{         }, "Up",    prefixed(function(n) scroller.frame_percent( 0, -n) end, images.scroll_step)},
-        {{"Shift"  }, "c",     function(n) scroller.frame_center() end},
-        {{"Shift"  }, "Left",  function(n) scroller.frame(-1,  0) end},
-        {{"Shift"  }, "Right", function(n) scroller.frame( 1,  0) end},
-        {{"Shift"  }, "Down",  function(n) scroller.frame( 0,  1) end},
-        {{"Shift"  }, "Up",    function(n) scroller.frame( 0, -1) end},
+        {{         }, "Left",  prefixed(function(n) scroller.picture_percent(-n,  0) end, images.scroll_step)},
+        {{         }, "Right", prefixed(function(n) scroller.picture_percent( n,  0) end, images.scroll_step)},
+        {{         }, "Down",  prefixed(function(n) scroller.picture_percent( 0,  n) end, images.scroll_step)},
+        {{         }, "Up",    prefixed(function(n) scroller.picture_percent( 0, -n) end, images.scroll_step)},
+        {{"Shift"  }, "c",     function(n) scroller.picture_center() end},
+        {{"Shift"  }, "Left",  function(n) scroller.picture(-1,  0) end},
+        {{"Shift"  }, "Right", function(n) scroller.picture( 1,  0) end},
+        {{"Shift"  }, "Down",  function(n) scroller.picture( 0,  1) end},
+        {{"Shift"  }, "Up",    function(n) scroller.picture( 0, -1) end},
 
         {{         }, "s",     function() resizer.to_native_aspect(IMG)    end},
         {{"Shift"  }, "s",     function() resizer.to_native(IMG)           end},
@@ -843,34 +843,17 @@ end
 --{{{{{{ callbacks: колбеки
 callbacks =
 {
-scroll =--{{{
-{
-    value = function()--{{{
-            --print('scroll changed')
-    end,
-    --}}}
-    other = function()--{{{
-        --print('something changed')
-        if (state.preview) then
-            scroller.preview_adjust_to_current()
-        else
-            --resizer.in_window_if_larger(IMG)
-        end
-    end,
-    --}}}
-},
---}}}
-resize = function(w, h)--{{{
-    if (state.appsize and (state.appsize.w ~= w or state.appsize.h ~= h)) then
-        --print('resize', state.appsize.w, state.appsize.h, w, h, app.width, app.height)
-        if (state.preview) then
-            viewer.update[preview]()
-        else
-            viewer.update[frame]()
-        end
-        state.update = true
+size = function(caller, x, y, w, h)--{{{
+    if (state.size[caller] and (state.size[caller].w ~= w or state.size[caller].h ~= h)) then
+    print('resize', caller, x, y, w, h)
+        --if (state.preview) then
+            --viewer.update[preview]()
+        --else
+            --viewer.update[picture]()
+        --end
+        --state.update = true
     end
-    state.appsize = {w = w, h = h}
+    state.size[caller] = {w = w, h = h}
 end,
 --}}}
 keypress = function(mods, name, value)--{{{

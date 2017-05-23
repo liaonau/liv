@@ -47,7 +47,7 @@
 #define CASE_STR(L, field, name, value) \
     if (g_strcmp0((field), #name) == 0) \
     { \
-        lua_pushboolean((L), (value)); \
+        lua_pushstring((L), (value)); \
         return 1; \
     } \
 

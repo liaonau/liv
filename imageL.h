@@ -2,5 +2,5 @@
 
 #include "conf.h"
 
-GdkPixbuf* image_create_pixbuf(imageL*);
+GdkPixbuf* image_get_pixbuf(imageL*);
 int luaopen_imageL(lua_State*, const gchar*);

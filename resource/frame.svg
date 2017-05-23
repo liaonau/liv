@@ -1,7 +1,0 @@
-<svg width="1000" height="1000">
-<!--<rect x="0" y="0" width="1000" height="1000" style="fill:black;stroke:white;stroke-width:50;fill-opacity:0;stroke-opacity:0.5"/>-->
-<rect x="0"   y="0"   width="1000" height="50"  style="fill:white;fill-opacity:0.5"/>
-<rect x="0"   y="950" width="1000" height="50"  style="fill:white;fill-opacity:0.5"/>
-<rect x="0"   y="50"  width="50"   height="900" style="fill:white;fill-opacity:0.5"/>
-<rect x="950" y="50"  width="50"   height="900" style="fill:white;fill-opacity:0.5"/>
-</svg>

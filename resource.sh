@@ -1,3 +1,5 @@
 #!/bin/bash
-#gdk-pixbuf-csource --build-list inline_frame resource/frame.svg inline_broken resource/broken.svg > resource.h
-gdk-pixbuf-csource --build-list inline_broken resource/broken.svg > resource.h
+gdk-pixbuf-csource --build-list \
+    inline_broken   resource/broken.png   \
+    inline_deferred resource/deferred.png \
+    > resource.h

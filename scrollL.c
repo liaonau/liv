@@ -2,6 +2,7 @@
 #include "scrollL.h"
 #include "imageL.h"
 #include "util.h"
+#include "idle.h"
 
 static int new_scrollL(lua_State *L)
 {
@@ -56,14 +57,13 @@ static int set_scroll_scrollL(lua_State *L)
     }
     return 0;
 }
+
 static int load_scrollL(lua_State *L)
 {
     scrollL* s = (scrollL*)luaL_checkudata(L, 1, UDATA_SCROLLL);
     imageL*  i = (imageL*)luaL_checkudata(L, 2, UDATA_IMAGEL);
-    GdkPixbuf* pxb = image_create_pixbuf(i);
-    gtk_image_set_from_pixbuf(s->image, pxb);
-    g_object_unref(pxb);
-    gtk_widget_show((GtkWidget*)s->image);
+    gboolean show_deferred = lua_toboolean(L, 3);
+    idle_load(L, s->image, i, show_deferred);
     return 0;
 }
 static int clear_scrollL(lua_State *L)
@@ -80,6 +80,12 @@ static int gc_scrollL(lua_State *L)
     g_object_unref(s->scroll);
     gtk_widget_destroy((GtkWidget*)s->scroll);
     return 0;
+}
+static int tostring_scrollL(lua_State *L)
+{
+    luaL_checkudata(L, 1, UDATA_SCROLLL);
+    lua_pushstring(L, LIB_SCROLLL);
+    return 1;
 }
 static int index_scrollL(lua_State *L)
 {
@@ -102,6 +108,7 @@ static const struct luaL_Reg scrollLlib_f [] =
 static const struct luaL_Reg scrollLlib_m [] =
 {
     {"__gc",       gc_scrollL      },
+    {"__tostring", tostring_scrollL},
     {"__index",    index_scrollL   },
     {NULL,         NULL            }
 };

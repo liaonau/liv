@@ -10,17 +10,17 @@
 #include <unistd.h>
 #include <locale.h>
 
-static gboolean luaH_init(void)
+static lua_State* init_lua_State(void)
 {
-    L = luaL_newstate();
+    lua_State* L = luaL_newstate();
     if (L == NULL)
-        return FALSE;
+        return NULL;
     luaL_openlibs(L);
     luaopen_imageL(L, LIB_IMAGEL);
     luaopen_gridL(L, LIB_GRIDL);
     luaopen_scrollL(L, LIB_SCROLLL);
     luaopen_appL(L, LIB_APPL);
-    return TRUE;
+    return L;
 }
 static int luaH_traceback(lua_State *L)
 {
@@ -45,7 +45,7 @@ static void luaH_pcall(lua_State *L, int nargs, int nresults)
     }
     lua_remove(L, error_func_pos);
 }
-static gboolean luaH_loadrc(gchar* confpath)
+static gboolean luaH_loadrc(lua_State* L, gchar* confpath)
 {
     const gchar* const *config_dirs = g_get_system_config_dirs();
     GPtrArray          *ptr_paths   = g_ptr_array_new();
@@ -60,28 +60,27 @@ static gboolean luaH_loadrc(gchar* confpath)
     gchar** p = paths;
     for (gint i = 0; p[i] && p ; i++)
     {
+        /*info("loadind «%s»", p[i]);*/
         if (!g_file_test(p[i], G_FILE_TEST_EXISTS))
-        {
             warn("«%s» doesn't exist", p[i]);
-            continue;
-        }
-        /*if (luaL_dofile(L, p[i]) == 0)*/
-        if (luaL_loadfile(L, p[i]) || lua_pcall(L, 0, 0, 0))
-        {
-            const char* msg = lua_tostring(L, -1);
-            if (msg == NULL)
-                msg = "(error with no message)";
-            warn("can't parse «%s».\n %s", p[i], msg);
-            lua_pop(L, 1);
-        }
         else
-            return TRUE;
+            if (luaL_loadfile(L, p[i]) || lua_pcall(L, 0, 0, 0))
+            {
+                const char* msg = lua_tostring(L, -1);
+                if (msg == NULL)
+                    msg = "(error with no message)";
+                warn("can't parse «%s».\n %s", p[i], msg);
+                lua_pop(L, 1);
+            }
+            else
+                return TRUE;
     }
     return FALSE;
 }
 
 static void cb_size(GtkWidget *widget, GdkRectangle *rect, gpointer data)
 {
+    lua_State* L = (lua_State*)data;
     gint top = lua_gettop(L);
     lua_getglobal(L, "callbacks");
     if (lua_istable(L, -1))
@@ -89,7 +88,12 @@ static void cb_size(GtkWidget *widget, GdkRectangle *rect, gpointer data)
         lua_getfield(L, -1, "size");
         if (lua_isfunction(L, -1))
         {
-            lua_pushstring(L, (gchar*)data);
+            if (GTK_IS_WINDOW(data))
+                lua_pushstring(L, "window");
+            else if (GTK_IS_FRAME(data))
+                lua_pushstring(L, "content");
+            else
+                lua_pushstring(L, "other");
             lua_pushnumber(L, rect->x);
             lua_pushnumber(L, rect->y);
             lua_pushnumber(L, rect->width);
@@ -99,10 +103,11 @@ static void cb_size(GtkWidget *widget, GdkRectangle *rect, gpointer data)
     }
     lua_settop(L, top);
 }
-static void cb_key(GtkWidget *widget, GdkEventKey *ev, gpointer user_data)
+static void cb_key(GtkWidget *widget, GdkEventKey *ev, gpointer data)
 {
     if (ev->type != GDK_KEY_PRESS || ev->is_modifier == 1)
         return;
+    lua_State* L = (lua_State*)data;
     gint top = lua_gettop(L);
     lua_getglobal(L, "callbacks");
     if (lua_istable(L, -1))
@@ -150,11 +155,6 @@ static void cb_key(GtkWidget *widget, GdkEventKey *ev, gpointer user_data)
 gint main(gint argc, gchar **argv)
 {
     setlocale(LC_ALL, "");
-    if (argc < 2)
-    {
-        info("nothing to display");
-        exit(0);
-    }
 
     gtk_init(&argc, &argv);
 
@@ -201,10 +201,11 @@ gint main(gint argc, gchar **argv)
 
     gtk_container_add(GTK_CONTAINER(window), (GtkWidget*)mainbox);
 
-    if (!luaH_init())
+    lua_State* L = init_lua_State();
+    if (!L)
         fatal("can't init Lua");
 
-    if (!luaH_loadrc(rcfile))
+    if (!luaH_loadrc(L, rcfile))
         fatal("can't find valid config file anywhere");
 
     lua_getglobal(L, "init");
@@ -213,10 +214,10 @@ gint main(gint argc, gchar **argv)
         lua_pushstring(L, argv[i]);
     luaH_pcall(L, argc - 1, 0);
 
-    g_signal_connect(window,  "destroy",         G_CALLBACK(gtk_main_quit), NULL);
-    g_signal_connect(window,  "key-press-event", G_CALLBACK(cb_key),        NULL);
-    g_signal_connect(window,  "size-allocate",   G_CALLBACK(cb_size),       "window");
-    g_signal_connect(content, "size-allocate",   G_CALLBACK(cb_size),       "content");
+    g_signal_connect(window,  "destroy",         G_CALLBACK(gtk_main_quit), (gpointer)L);
+    g_signal_connect(window,  "key-press-event", G_CALLBACK(cb_key),        (gpointer)L);
+    g_signal_connect(window,  "size-allocate",   G_CALLBACK(cb_size),       (gpointer)L);
+    g_signal_connect(content, "size-allocate",   G_CALLBACK(cb_size),       (gpointer)L);
 
     gtk_widget_show_all((GtkWidget*)window);
     gtk_main();

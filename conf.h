@@ -25,10 +25,12 @@ typedef struct appL
 appL;
 typedef struct gridL
 {
-    GtkGrid*   grid;
-    GPtrArray* frames;
-    gint       rows;
-    gint       cols;
+    GtkScrolledWindow* scroll;
+    GtkGrid*           grid;
+    GPtrArray*         frames;
+    gint               size;
+    gint               rows;
+    gint               cols;
 }
 gridL;
 typedef struct scrollL
@@ -39,14 +41,38 @@ typedef struct scrollL
 scrollL;
 typedef struct imageL
 {
-    GdkPixbuf* pxb;
-    guint8     state;
-    gint       width;
-    gint       height;
+    GdkPixbuf*       pxb;
+    gchar*           path;
+    gboolean         memorize;
+    gboolean         broken;
+    GdkPixbufFormat* format;
+    guint8           state;
+    gint             width;
+    gint             height;
+    gint             native_width;
+    gint             native_height;
 }
 imageL;
-
-lua_State* L;
+typedef struct idle_load_t
+{
+    gint       ref;
+    imageL*    i;
+    GdkPixbuf* pxb;
+    lua_State* L;
+    GtkImage*  image;
+}
+idle_load_t;
+typedef void       (*idle_pixbuf_fail_cb)(imageL*);
+typedef GdkPixbuf* (*idle_pixbuf_load_cb)(imageL*);
+typedef struct idle_pixbuf_t
+{
+    imageL*             i;
+    GdkPixbuf*          pxb;
+    idle_pixbuf_load_cb load_cb;
+    imageL*             load_source;
+    idle_pixbuf_fail_cb fail_cb;
+}
+idle_pixbuf_t;
 
 GtkWindow* window;
 GtkFrame*  content;

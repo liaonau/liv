@@ -69,7 +69,7 @@ static int display_appL(lua_State *L)
         luaL_getmetatable(L, UDATA_SCROLLL);
         luaL_getmetatable(L, UDATA_GRIDL);
         if (lua_equal(L, -3, -1))
-            to_display = (GtkWidget*)(((gridL*)(data))->grid);
+            to_display = (GtkWidget*)(((gridL*)(data))->scroll);
         else if (lua_equal(L, -3, -2))
             to_display = (GtkWidget*)(((scrollL*)(data))->scroll);
         else
@@ -95,39 +95,49 @@ static int mode_appL(lua_State *L)
     return 1;
 }
 
+static int is_file_appL(lua_State *L)
+{
+    luaL_checkudata(L, 1, UDATA_APPL);
+    const gchar* path = luaL_checkstring(L, 2);
+    lua_pushboolean(L, g_file_test(path, G_FILE_TEST_IS_REGULAR));
+    return 1;
+}
+static int xdg_appL(lua_State *L)
+{
+    luaL_checkudata(L, 1, UDATA_APPL);
+    lua_newtable(L);
+    lua_pushstring(L, g_get_home_dir());
+    lua_setfield(L, -2, "home");
+    lua_pushstring(L, g_get_user_config_dir());
+    lua_setfield(L, -2, "config");
+    lua_pushstring(L, g_get_user_cache_dir());
+    lua_setfield(L, -2, "cache");
+    lua_pushstring(L, g_get_user_data_dir());
+    lua_setfield(L, -2, "data");
+    return 1;
+}
+
 static int index_appL(lua_State *L)
 {
     luaL_checkudata(L, 1, UDATA_APPL);
     const gchar* field = luaL_checkstring(L, 2);
-    if (     g_strcmp0(field, "name") == 0)
-        lua_pushstring(L, APPNAME);
-    else if (g_strcmp0(field, "title") == 0)
-        lua_pushstring(L, gtk_window_get_title(window));
-    else if (g_strcmp0(field, "window_size") == 0)
-        lua_pushcfunction(L, window_size_appL);
-    else if (g_strcmp0(field, "content_size") == 0)
-        lua_pushcfunction(L, content_size_appL);
-    else if (g_strcmp0(field, "status_visible") == 0)
-    {
-        gboolean visible = gtk_widget_get_visible((GtkWidget*)statusbox);
-        lua_pushboolean(L, visible);
-    }
-    else if (g_strcmp0(field, "status_left") == 0)
-        lua_pushstring(L, gtk_label_get_text(status_left));
-    else if (g_strcmp0(field, "status_right") == 0)
-        lua_pushstring(L, gtk_label_get_text(status_right));
-    else if (g_strcmp0(field, "resize") == 0)
-        lua_pushcfunction(L, resize_appL);
-    else if (g_strcmp0(field, "quit") == 0)
-        lua_pushcfunction(L, quit_appL);
-    else if (g_strcmp0(field, "style") == 0)
-        lua_pushcfunction(L, style_appL);
-    else if (g_strcmp0(field, "display") == 0)
-        lua_pushcfunction(L, display_appL);
-    else if (g_strcmp0(field, "mode") == 0)
-        lua_pushcfunction(L, mode_appL);
-    else
-        lua_pushnil(L);
+
+    CASE_STR( L, field, name,           APPNAME);
+    CASE_STR( L, field, title,          gtk_window_get_title(window));
+    CASE_BOOL(L, field, status_visible, gtk_widget_get_visible((GtkWidget*)statusbox));
+    CASE_STR( L, field, status_left,    gtk_label_get_text(status_left));
+    CASE_STR( L, field, status_right,   gtk_label_get_text(status_right));
+
+    CASE_FUNC(L, field, window_size,  app);
+    CASE_FUNC(L, field, content_size, app);
+    CASE_FUNC(L, field, resize,       app);
+    CASE_FUNC(L, field, quit,         app);
+    CASE_FUNC(L, field, style,        app);
+    CASE_FUNC(L, field, display,      app);
+    CASE_FUNC(L, field, mode,         app);
+    CASE_FUNC(L, field, is_file,      app);
+    CASE_FUNC(L, field, xdg,          app);
+
     return 1;
 }
 static int newindex_appL(lua_State *L)
