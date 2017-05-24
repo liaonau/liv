@@ -5,7 +5,7 @@
 #include "idle.h"
 
 #define CHECK_ARGS \
-    gridL*  g   = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL); \
+    gridL*  g   = (gridL*)luaL_checkudata(L, 1, GRID); \
     gint    idx = luaL_checkint(L, 2) - 1; \
     if (!grid_pos_exists(g, idx)) \
         return 0; \
@@ -49,20 +49,20 @@ static int new_gridL(lua_State* L)
     g->size  = 1;
     g->frames = g_ptr_array_new_with_free_func(&frame_free);
 
-    luaL_getmetatable(L, UDATA_GRIDL);
+    luaL_getmetatable(L, GRID);
     lua_setmetatable(L, -2);
     return 1;
 }
 static int get_size_gridL(lua_State* L)
 {
-    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL* g = (gridL*)luaL_checkudata(L, 1, GRID);
     lua_pushnumber(L, g->frames->len);
     lua_pushnumber(L, g->size);
     return 2;
 }
 static int set_size_gridL(lua_State* L)
 {
-    gridL*  g  = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL*  g  = (gridL*)luaL_checkudata(L, 1, GRID);
     gint items = luaL_checkint(L, 2);
     gint size  = luaL_checkint(L, 3);
     if (items < 0 || size < 1)
@@ -98,7 +98,7 @@ static int set_size_gridL(lua_State* L)
 }
 static int preferred_size_gridL(lua_State* L)
 {
-    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL* g = (gridL*)luaL_checkudata(L, 1, GRID);
     gint len = g->frames->len;
     gint w   = 1;
     gint h   = 1;
@@ -158,7 +158,7 @@ static int clear_gridL(lua_State* L)
 }
 static int clear_all_gridL(lua_State* L)
 {
-    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL* g = (gridL*)luaL_checkudata(L, 1, GRID);
     gint len = g->frames->len;
     for (gint idx = 0; idx < len; idx++)
     {
@@ -172,7 +172,7 @@ static int clear_all_gridL(lua_State* L)
 static int load_gridL(lua_State* L)
 {
     CHECK_ARGS;
-    imageL* i = (imageL*)luaL_checkudata(L, 3, UDATA_IMAGEL);
+    imageL* i = (imageL*)luaL_checkudata(L, 3, IMAGE);
     GtkImage* image = (GtkImage*)gtk_bin_get_child(GTK_BIN(frame));
     gboolean show_deferred = lua_toboolean(L, 3);
     idle_load(L, image, i, show_deferred);
@@ -188,7 +188,7 @@ static int detach_gridL(lua_State* L)
 }
 static int detach_all_gridL(lua_State* L)
 {
-    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL* g = (gridL*)luaL_checkudata(L, 1, GRID);
     gint len = g->frames->len;
     for (gint idx = 0; idx < len; idx++)
     {
@@ -216,7 +216,7 @@ static int attach_gridL(lua_State* L)
 
 static int get_scroll_gridL(lua_State *L)
 {
-    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL* g = (gridL*)luaL_checkudata(L, 1, GRID);
     GtkAdjustment* hadj = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)g->scroll);
     GtkAdjustment* vadj = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)g->scroll);
     gdouble hscroll = gtk_adjustment_get_value(hadj);
@@ -235,7 +235,7 @@ static int get_scroll_gridL(lua_State *L)
 }
 static int set_scroll_gridL(lua_State *L)
 {
-    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL* g = (gridL*)luaL_checkudata(L, 1, GRID);
     if (lua_istable(L, 2))
     {
         GtkAdjustment* hadj = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)g->scroll);
@@ -256,7 +256,7 @@ static int set_scroll_gridL(lua_State *L)
 
 static int gc_gridL(lua_State* L)
 {
-    gridL *g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL *g = (gridL*)luaL_checkudata(L, 1, GRID);
     g_ptr_array_free(g->frames, TRUE);
     g_object_unref(g->grid);
     g_object_unref(g->scroll);
@@ -266,13 +266,13 @@ static int gc_gridL(lua_State* L)
 }
 static int tostring_gridL(lua_State* L)
 {
-    luaL_checkudata(L, 1, UDATA_GRIDL);
+    luaL_checkudata(L, 1, GRID);
     lua_pushstring(L, LIB_GRIDL);
     return 1;
 }
 static int index_gridL(lua_State* L)
 {
-    gridL *g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL *g = (gridL*)luaL_checkudata(L, 1, GRID);
     const gchar* field = luaL_checkstring(L, 2);
 
     CASE_FUNC(L, field, get_size,       grid);
@@ -306,7 +306,7 @@ static int index_gridL(lua_State* L)
 }
 static int newindex_gridL(lua_State* L)
 {
-    gridL *g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gridL *g = (gridL*)luaL_checkudata(L, 1, GRID);
     const gchar* field = luaL_checkstring(L, 2);
     if (g_strcmp0(field, "spacing") == 0)
     {
@@ -346,7 +346,7 @@ static const struct luaL_Reg gridLlib_m [] =
 };
 int luaopen_gridL(lua_State *L, const gchar* name)
 {
-    luaL_newmetatable(L, UDATA_GRIDL);
+    luaL_newmetatable(L, GRID);
     luaL_setfuncs(L, gridLlib_m, 0);
     luaL_newlib(L, gridLlib_f, name);
     return 1;

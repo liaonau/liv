@@ -16,10 +16,11 @@ static lua_State* init_lua_State(void)
     if (L == NULL)
         return NULL;
     luaL_openlibs(L);
-    luaopen_imageL(L, LIB_IMAGEL);
-    luaopen_gridL(L, LIB_GRIDL);
-    luaopen_scrollL(L, LIB_SCROLLL);
-    luaopen_appL(L, LIB_APPL);
+    luaopen_appL(   L, APP);
+    luaopen_frameL( L, FRAME);
+    luaopen_imageL( L, IMAGE);
+    luaopen_gridL(  L, GRID);
+    luaopen_scrollL(L, SCROLL);
     return L;
 }
 static int luaH_traceback(lua_State *L)

@@ -1,11 +1,14 @@
 #include "luaL.h"
 #include "util.h"
+#include "appL.h"
+#include "gridL.h"
+#include "scrollL.h"
 
 #include <stdlib.h>
 
 static int quit_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     if (gtk_main_level() != 0)
         gtk_main_quit();
     else
@@ -14,7 +17,7 @@ static int quit_appL(lua_State *L)
 }
 static int resize_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     gint w = luaL_checknumber(L, 2);
     gint h = luaL_checknumber(L, 3);
     if (w > 0 && h > 0)
@@ -23,7 +26,7 @@ static int resize_appL(lua_State *L)
 }
 static int content_size_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     GtkAllocation alloc;
     gtk_widget_get_allocation((GtkWidget*)content, &alloc);
     lua_pushnumber(L, alloc.width);
@@ -32,7 +35,7 @@ static int content_size_appL(lua_State *L)
 }
 static int window_size_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     gint w, h;
     gtk_window_get_size(window, &w, &h);
     lua_pushnumber(L, w);
@@ -41,7 +44,7 @@ static int window_size_appL(lua_State *L)
 }
 static int style_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     size_t size = 0;
     const gchar* data = luaL_checklstring(L, 2, &size);
     if (size == 0)
@@ -57,7 +60,7 @@ static int style_appL(lua_State *L)
 }
 static int display_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     gpointer data = lua_touserdata(L, 2);
     GtkWidget* to_display;
     GtkWidget* child = gtk_bin_get_child(GTK_BIN(content));
@@ -66,8 +69,8 @@ static int display_appL(lua_State *L)
     else
     {
         lua_getmetatable(L, 2);
-        luaL_getmetatable(L, UDATA_SCROLLL);
-        luaL_getmetatable(L, UDATA_GRIDL);
+        luaL_getmetatable(L, SCROLL);
+        luaL_getmetatable(L, GRID);
         if (lua_equal(L, -3, -1))
             to_display = (GtkWidget*)(((gridL*)(data))->scroll);
         else if (lua_equal(L, -3, -2))
@@ -84,7 +87,7 @@ static int display_appL(lua_State *L)
 }
 static int mode_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     GtkWidget* child = gtk_bin_get_child(GTK_BIN(content));
     if (GTK_IS_GRID(child))
         lua_pushstring(L, LIB_GRIDL);
@@ -97,14 +100,14 @@ static int mode_appL(lua_State *L)
 
 static int is_file_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     const gchar* path = luaL_checkstring(L, 2);
     lua_pushboolean(L, g_file_test(path, G_FILE_TEST_IS_REGULAR));
     return 1;
 }
 static int xdg_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     lua_newtable(L);
     lua_pushstring(L, g_get_home_dir());
     lua_setfield(L, -2, "home");
@@ -119,7 +122,7 @@ static int xdg_appL(lua_State *L)
 
 static int index_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     const gchar* field = luaL_checkstring(L, 2);
 
     CASE_STR( L, field, name,           APPNAME);
@@ -142,7 +145,7 @@ static int index_appL(lua_State *L)
 }
 static int newindex_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     const gchar* field = luaL_checkstring(L, 2);
     if (     g_strcmp0(field, "title") == 0)
     {
@@ -168,10 +171,11 @@ static int newindex_appL(lua_State *L)
 }
 static int tostring_appL(lua_State *L)
 {
-    luaL_checkudata(L, 1, UDATA_APPL);
+    luaL_checkudata(L, 1, APP);
     lua_pushstring(L, APPNAME);
     return 1;
 }
+
 static const struct luaL_Reg appLlib_m [] =
 {
     {"__tostring", tostring_appL},
@@ -182,7 +186,7 @@ static const struct luaL_Reg appLlib_m [] =
 int luaopen_appL(lua_State *L, const gchar* name)
 {
     lua_newuserdata(L, sizeof(appL));
-    luaL_newmetatable(L, UDATA_APPL);
+    luaL_newmetatable(L, APP);
     luaL_setfuncs(L, appLlib_m, 0);
     lua_setmetatable(L, -2);
     lua_setglobal(L, name);

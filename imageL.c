@@ -208,7 +208,7 @@ static int new_imageL(lua_State *L)
     i->state  = 0;
     if (i->memorize && !image_is_broken(i))
         idle_pixbuf(i, &image_pixbuf_from_file, i, &image_set_broken);
-    luaL_getmetatable(L, UDATA_IMAGEL);
+    luaL_getmetatable(L, IMAGE);
     lua_setmetatable(L, -2);
     return 1;
 }
@@ -229,7 +229,7 @@ static int info_imageL(lua_State *L)
 
 static int rotate_imageL(lua_State* L)
 {
-    imageL* i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     gboolean clockwise = lua_toboolean(L, 2);
 
     guint8 action = (clockwise ? 1 : 3);
@@ -238,7 +238,7 @@ static int rotate_imageL(lua_State* L)
 }
 static int flip_imageL(lua_State* L)
 {
-    imageL* i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     gboolean horizontal = lua_toboolean(L, 2);
 
     guint action = (horizontal) ? 4 : 6;
@@ -247,7 +247,7 @@ static int flip_imageL(lua_State* L)
 }
 static int set_state_imageL(lua_State* L)
 {
-    imageL* i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     guint8 state = luaL_checkinteger(L, 2);
 
     state_change(i, state);
@@ -255,7 +255,7 @@ static int set_state_imageL(lua_State* L)
 }
 static int reset_imageL(lua_State* L)
 {
-    imageL* i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     i->state  = 0;
     i->width  = i->native_width;
     i->height = i->native_height;
@@ -263,7 +263,7 @@ static int reset_imageL(lua_State* L)
 }
 static int scale_imageL(lua_State* L)
 {
-    imageL* i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     gint width  = luaL_checkinteger(L, 2);
     gint height = luaL_checkinteger(L, 3);
     scale_change(i, width, height);
@@ -272,7 +272,7 @@ static int scale_imageL(lua_State* L)
 
 static int fork_imageL(lua_State *L)
 {
-    imageL* p = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    imageL* p = (imageL*)luaL_checkudata(L, 1, IMAGE);
     imageL* i = (imageL*)lua_newuserdata(L, sizeof(imageL));
     i->path          = g_strdup(p->path);
     idle_pixbuf(i, &image_get_pixbuf, p, NULL);
@@ -284,7 +284,7 @@ static int fork_imageL(lua_State *L)
     i->width         = p->width;
     i->height        = p->height;
     i->state         = 0;
-    luaL_getmetatable(L, UDATA_IMAGEL);
+    luaL_getmetatable(L, IMAGE);
     lua_setmetatable(L, -2);
     return 1;
 }
@@ -300,12 +300,12 @@ static int fork_imageL(lua_State *L)
     /*c->width         = i->width;*/
     /*c->height        = i->height;*/
     /*c->state         = i->state;*/
-    /*luaL_getmetatable(L, UDATA_IMAGEL);*/
+    /*luaL_getmetatable(L, IMAGE);*/
     /*lua_setmetatable(L, -2);*/
 /*}*/
 static int dump_imageL(lua_State* L)
 {
-    imageL* i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     const gchar* path = luaL_checkstring(L, 2);
 
     GdkPixbuf* pxb = image_get_pixbuf(i);
@@ -344,7 +344,7 @@ static int dump_imageL(lua_State* L)
 
 static int gc_imageL(lua_State *L)
 {
-    imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    imageL *i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     g_free(i->path);
     if (i->pxb)
     {
@@ -355,7 +355,7 @@ static int gc_imageL(lua_State *L)
 }
 static int index_imageL(lua_State *L)
 {
-    imageL *i = (imageL*)luaL_checkudata(L, 1, UDATA_IMAGEL);
+    imageL *i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     const gchar* field = luaL_checkstring(L, 2);
 
     CASE_NUM( L, field, width,         i->width);
@@ -413,7 +413,7 @@ int luaopen_imageL(lua_State *L, const gchar* name)
     }
     g_slist_free(formats);
 
-    luaL_newmetatable(L, UDATA_IMAGEL);
+    luaL_newmetatable(L, IMAGE);
     luaL_setfuncs(L, imageLlib_m, 0);
     luaL_newlib(L, imageLlib_f, name);
     return 1;
