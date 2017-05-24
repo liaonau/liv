@@ -110,15 +110,17 @@ regrid = function() --{{{
         local d, n, e = texter.split_path(pics[idx].path)
         preview:set_label(idx, n..(e == '' and '' or '.'..e))
         --preview:set_label(idx, d..n..(e == '' and '' or '.'..e))
-        preview:load(idx, pics[idx].thumb)
+        preview:load(idx, pics[idx].thumb, true)
     end
     local psw, psh = preview:preferred_size()
     local cw,  ch  = app:content_size()
+    print(cw, ch)
     local spc = preview.spacing
     local fw, fh = psw + spc.row, psh + spc.column
     local square = math.ceil(math.sqrt(#pics))
-    local r = math.min(square, math.floor(cw / fw))
+    local r = math.max(math.min(square, math.floor(cw / fw)))
     local c = math.min(math.ceil(#pics / r), math.floor(ch / fh))
+    print(psw, psh)
     local v = r * c
     for idx = 1, #pics do
     --for idx = 1, math.min(v, #pics) do
@@ -264,7 +266,7 @@ end,
 set_status = function() --{{{
     local cond = function(cond, s) return cond and s or '' end
     local spc  = ' '
-    local w, h = dims.size(IMG)
+    local w, h = IMG.width, IMG.height
     local W, H = IMG.native_width, IMG.native_height
     local zw, zh = 100 * (w / W), 100 * (h / H)
 
@@ -335,7 +337,7 @@ update_picture = function()--{{{
     if (DSP == picture and state.picixd ~= IDX) then
         picture:load(IMG, not IMG.memorize)
         state.picixd = IDX
-        print('теперь № '..IDX)
+        --print('теперь № '..IDX)
     end
 end,
 --}}}
@@ -509,12 +511,11 @@ end,
 --{{{dims        : вычисления размеров изображений
 dims =
 {
-size    = function(i) return i.width,        i.height        end,
 native  = function(i) return i.native_width, i.native_height end,
 native_aspect = function(i) --{{{
     local W, H = dims.native(i)
     local na = W / H
-    local w, h = dims.size(i)
+    local w, h = i.width, i.height
     local a = w / h
     if (a > na) then
         w = h * na
@@ -549,7 +550,7 @@ inscribe = function(i, W, H) --{{{
 end,
 --}}}
 fits = function(i, W, H) --{{{
-    local w, h = dims.size(i)
+    local w, h = i.width, i.height
     return (w <= W and h <=H)
 end,
 --}}}
@@ -596,7 +597,7 @@ end,
 
 zoom_mul  = function(i, s) --{{{
     local min, max = dims.constrains(i)
-    local w, h = dims.size(i)
+    local w, h = i.width, i.height
     local a = w / h
     w, h = w * s, h * s
     if ((w / h) ~= a) then
@@ -615,7 +616,7 @@ zoom_add  = function(i, step) --{{{
 end,
 --}}}
 scale_add = function(i, step_w, step_h) --{{{
-    local w, h = dims.size(i)
+    local w, h = i.width, i.height
     if i.swapped then
         step_w, step_h = step_h, step_w
     end
@@ -838,6 +839,7 @@ hotkeys =
     any = --{{{
     {
         {{         }, "i", test},
+        {{"Control"}, "i", function() print(preview:preferred_size()) end},
 
         {{         }, "m", function() marker.toggle(IDX) end},
         {{"Shift"  }, "m", function() marker.reverse()   end},

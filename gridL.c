@@ -2,6 +2,7 @@
 #include "gridL.h"
 #include "imageL.h"
 #include "util.h"
+#include "idle.h"
 
 #define CHECK_ARGS \
     gridL*  g   = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL); \
@@ -75,30 +76,33 @@ static int set_size_gridL(lua_State* L)
         {
             GtkWidget* frame = gtk_frame_new("");
             g_object_ref_sink(frame);
-            GtkLabel* label  = (GtkLabel*)gtk_frame_get_label_widget((GtkFrame*)frame);
+
+            GtkLabel* label = (GtkLabel*)gtk_frame_get_label_widget((GtkFrame*)frame);
             gtk_label_set_max_width_chars(label, 1);
             gtk_label_set_ellipsize(label, PANGO_ELLIPSIZE_START);
             gtk_label_set_line_wrap(label, FALSE);
             gtk_frame_set_shadow_type((GtkFrame*)frame, GTK_SHADOW_ETCHED_OUT);
+
             GtkWidget* image = gtk_image_new();
             gtk_container_add(GTK_CONTAINER(frame), image);
+            gtk_widget_show_all(frame);
+
             g_ptr_array_add(g->frames, frame);
             g_ptr_array_remove_index_fast(g->frames, i);
         }
         GtkFrame* frame = (GtkFrame*)g_ptr_array_index(g->frames, i);
         GtkImage* image = (GtkImage*)gtk_bin_get_child(GTK_BIN(frame));
         gtk_widget_set_size_request((GtkWidget*)image, size, size);
-        /*gtk_widget_set_size_request((GtkWidget*)frame, size, size);*/
     }
     return 0;
 }
 static int preferred_size_gridL(lua_State* L)
 {
-    gridL*  g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
-    gint len  = g->frames->len;
-    gint w = 1;
-    gint h = 1;
-    for (gint i = 0; i <len ; i++)
+    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gint len = g->frames->len;
+    gint w   = 1;
+    gint h   = 1;
+    for (gint i = 0; i < len; i++)
     {
         GtkFrame* f = (GtkFrame*)g_ptr_array_index(g->frames, i);
         GtkRequisition nat;
@@ -125,6 +129,7 @@ static int set_name_gridL(lua_State* L)
     CHECK_ARGS;
     const gchar* name = luaL_checkstring(L, 3);
     gtk_widget_set_name((GtkWidget*)frame, name);
+    gtk_widget_show_all((GtkWidget*)frame);
     return 0;
 }
 static int get_label_gridL(lua_State* L)
@@ -140,6 +145,7 @@ static int set_label_gridL(lua_State* L)
     CHECK_ARGS;
     const gchar* label = lua_tostring(L, 3);
     gtk_frame_set_label(frame, label);
+    gtk_widget_show_all((GtkWidget*)frame);
     return 0;
 }
 static int clear_gridL(lua_State* L)
@@ -150,15 +156,46 @@ static int clear_gridL(lua_State* L)
     gtk_widget_show_all((GtkWidget*)frame);
     return 0;
 }
+static int clear_all_gridL(lua_State* L)
+{
+    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gint len = g->frames->len;
+    for (gint idx = 0; idx < len; idx++)
+    {
+        GtkFrame* frame = (GtkFrame*)g_ptr_array_index(g->frames, idx);
+        GtkImage* image = (GtkImage*)gtk_bin_get_child(GTK_BIN(frame));
+        gtk_image_clear(image);
+    }
+    gtk_widget_show_all((GtkWidget*)g->grid);
+    return 0;
+}
 static int load_gridL(lua_State* L)
 {
     CHECK_ARGS;
     imageL* i = (imageL*)luaL_checkudata(L, 3, UDATA_IMAGEL);
     GtkImage* image = (GtkImage*)gtk_bin_get_child(GTK_BIN(frame));
-    GdkPixbuf* pxb  = image_get_pixbuf(i);
-    gtk_image_set_from_pixbuf(image, pxb);
-    g_object_unref(pxb);
+    gboolean show_deferred = lua_toboolean(L, 3);
+    idle_load(L, image, i, show_deferred);
     gtk_widget_show_all((GtkWidget*)frame);
+    return 0;
+}
+static int detach_gridL(lua_State* L)
+{
+    CHECK_ARGS;
+    gtk_container_remove(GTK_CONTAINER(g->grid), (GtkWidget*)frame);
+    gtk_widget_show_all((GtkWidget*)frame);
+    return 0;
+}
+static int detach_all_gridL(lua_State* L)
+{
+    gridL* g = (gridL*)luaL_checkudata(L, 1, UDATA_GRIDL);
+    gint len = g->frames->len;
+    for (gint idx = 0; idx < len; idx++)
+    {
+        GtkFrame* frame = (GtkFrame*)g_ptr_array_index(g->frames, idx);
+        gtk_container_remove(GTK_CONTAINER(g->grid), (GtkWidget*)frame);
+    }
+    gtk_widget_show_all((GtkWidget*)g->grid);
     return 0;
 }
 static int attach_gridL(lua_State* L)
@@ -167,9 +204,12 @@ static int attach_gridL(lua_State* L)
     gint l = luaL_checkinteger(L, 3);
     gint t = luaL_checkinteger(L, 4);
     GtkWidget* c = gtk_grid_get_child_at(g->grid, l, t);
-    if (c)
-        gtk_container_remove(GTK_CONTAINER(g->grid), c);
-    gtk_grid_attach(g->grid, (GtkWidget*)frame, l, t, 1, 1);
+    if (frame != (GtkFrame*)c)
+    {
+        if (c)
+            gtk_container_remove(GTK_CONTAINER(g->grid), c);
+        gtk_grid_attach(g->grid, (GtkWidget*)frame, l, t, 1, 1);
+    }
     gtk_widget_show_all((GtkWidget*)frame);
     return 0;
 }
@@ -248,7 +288,10 @@ static int index_gridL(lua_State* L)
     CASE_FUNC(L, field, set_scroll,     grid);
 
     CASE_FUNC(L, field, clear,          grid);
+    CASE_FUNC(L, field, clear_all,      grid);
     CASE_FUNC(L, field, load,           grid);
+    CASE_FUNC(L, field, detach,         grid);
+    CASE_FUNC(L, field, detach_all,     grid);
     CASE_FUNC(L, field, attach,         grid);
 
     if (g_strcmp0(field, "spacing") == 0)

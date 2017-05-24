@@ -4,7 +4,7 @@
 #include "resource.h"
 #include "idle.h"
 
-static GdkPixbuf*       BROKENpxb;
+/*static GdkPixbuf*       BROKENpxb;*/
 static GdkPixbufFormat* PNGformat;
 
 //таблица умножения группы четырех вращений и вертикального и горизонтального отражения
