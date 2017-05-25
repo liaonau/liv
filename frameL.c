@@ -2,7 +2,8 @@
 #include "frameL.h"
 #include "imageL.h"
 #include "util.h"
-#include "idle.h"
+#include "inlined.h"
+/*#include "idle.h"*/
 
 static int new_frameL(lua_State *L)
 {
@@ -10,25 +11,65 @@ static int new_frameL(lua_State *L)
 
     f->frame = (GtkFrame*)gtk_frame_new(NULL);
     g_object_ref_sink(f->frame);
-    /*gtk_frame_set_shadow_type((GtkFrame*)frame, GTK_SHADOW_ETCHED_OUT);*/
-    gtk_frame_set_shadow_type((GtkFrame*)frame, GTK_SHADOW_NONE);
-    
-    GtkLabel* label = (GtkLabel*)gtk_frame_get_label_widget((GtkFrame*)f);
-    gtk_label_set_max_width_chars(label, 1);
-    gtk_label_set_ellipsize(label, PANGO_ELLIPSIZE_START);
-    gtk_label_set_line_wrap(label, FALSE);
+
+    gtk_frame_set_shadow_type((GtkFrame*)f->frame, GTK_SHADOW_NONE);
 
     f->image = (GtkImage*)gtk_image_new();
     gtk_container_add(GTK_CONTAINER(f->frame), (GtkWidget*)f->image);
 
-    gtk_widget_show_all(f);
+    f->ref = LUA_REFNIL;
+
+    gtk_widget_show_all((GtkWidget*)f->frame);
 
     luaL_getmetatable(L, FRAME);
     lua_setmetatable(L, -2);
     return 1;
 }
 
-static int get_name_frameL(lua_State* L)
+static void luaH_frame_update(lua_State* L, frameL* f)
+{
+    lua_rawgeti(L, LUA_REGISTRYINDEX, f->ref);
+    if (lua_isuserdata(L, -1))
+    {
+        imageL* i = (imageL*)luaL_checkudata(L, -1, IMAGE);
+        GdkPixbuf* pxb = image_get_pixbuf(i);
+        if (!GDK_IS_PIXBUF(pxb))
+        {
+            pxb = BROKENpxb;
+            g_object_ref(pxb);
+        }
+        lua_pop(L, 1);
+        gtk_image_set_from_pixbuf(f->image, pxb);
+        gtk_widget_show_all((GtkWidget*)f->frame);
+        g_object_unref(pxb);
+    }
+    /*gboolean show_deferred = lua_toboolean(L, 3);*/
+    /*idle_load(L, f->image, i, show_deferred);*/
+}
+
+static int image_get_frameL(lua_State* L)
+{
+    frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, f->ref);
+    return 1;
+}
+static int image_set_frameL(lua_State* L)
+{
+    frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
+    luaL_unref(L, LUA_REGISTRYINDEX, f->ref);
+    if (lua_isuserdata(L, 2))
+    {
+        luaL_checkudata(L, 2, IMAGE);
+        lua_pushvalue(L, 2);
+        f->ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    }
+    else
+        f->ref = LUA_REFNIL;
+    luaH_frame_update(L, f);
+    return 0;
+}
+
+static int name_get_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
     const gchar* name = gtk_widget_get_name((GtkWidget*)f->frame);
@@ -36,7 +77,7 @@ static int get_name_frameL(lua_State* L)
         lua_pushstring(L, name);
     return 1;
 }
-static int set_name_frameL(lua_State* L)
+static int name_set_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
     const gchar* name = luaL_checkstring(L, 2);
@@ -44,7 +85,7 @@ static int set_name_frameL(lua_State* L)
     gtk_widget_show_all((GtkWidget*)f->frame);
     return 0;
 }
-static int get_label_frameL(lua_State* L)
+static int label_get_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
     const gchar* label = gtk_frame_get_label(f->frame);
@@ -52,52 +93,99 @@ static int get_label_frameL(lua_State* L)
         lua_pushstring(L, label);
     return 1;
 }
-static int set_label_frameL(lua_State* L)
+static int label_set_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
-    const gchar* label = lua_tostring(L, 2);
-    gtk_frame_set_label(f->frame, label);
+    const gchar* text = lua_tostring(L, 2);
+    gtk_frame_set_label(f->frame, text);
+
+    GtkLabel* label = (GtkLabel*)gtk_frame_get_label_widget((GtkFrame*)f->frame);
+    gtk_label_set_ellipsize(label, PANGO_ELLIPSIZE_START);
+    gtk_label_set_line_wrap(label, FALSE);
+
+    gtk_widget_show_all((GtkWidget*)f->frame);
+    return 0;
+}
+static int shadow_get_frameL(lua_State* L)
+{
+    frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
+    GtkShadowType shadow = gtk_frame_get_shadow_type((GtkFrame*)f->frame);
+    lua_pushboolean(L, shadow != GTK_SHADOW_NONE);
+    return 1;
+}
+static int shadow_set_frameL(lua_State* L)
+{
+    frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
+    gboolean shadow = lua_toboolean(L, 2);
+    gtk_frame_set_shadow_type((GtkFrame*)f->frame, shadow ? GTK_SHADOW_ETCHED_OUT : GTK_SHADOW_NONE);
     gtk_widget_show_all((GtkWidget*)f->frame);
     return 0;
 }
 
-static int load_frameL(lua_State *L)
+static int size_request_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
-    imageL* i = (imageL*)luaL_checkudata(L, 2, IMAGE);
-    gboolean show_deferred = lua_toboolean(L, 3);
-    idle_load(L, f->image, i, show_deferred);
+    gint w = luaL_checkint(L, 2);
+    gint h = luaL_checkint(L, 3);
+    if (w < 1 || h < 1)
+    {
+        w = 1;
+        h = 1;
+    }
+    gtk_widget_set_size_request((GtkWidget*)f->image, w, h);
     return 0;
 }
-static int clear_frameL(lua_State *L)
+static int preferred_size_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
-    gtk_image_clear(f->image);
-    gtk_widget_show((GtkWidget*)f->frame);
-    return 0;
+    GtkRequisition nat;
+    gtk_widget_get_preferred_size((GtkWidget*)f->frame, NULL, &nat);
+    lua_pushnumber(L, nat.width);
+    lua_pushnumber(L, nat.height);
+    return 2;
 }
 
 static int gc_frameL(lua_State *L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
-    g_object_unref(f->image);
+    luaL_unref(L, LUA_REGISTRYINDEX, f->ref);
     g_object_unref(f->frame);
-    gtk_widget_destroy((GtkWidget*)f->frame);
     return 0;
+}
+static int tostring_frameL(lua_State *L)
+{
+    luaL_checkudata(L, 1, FRAME);
+    lua_pushstring(L, FRAME);
+    return 1;
 }
 static int index_frameL(lua_State *L)
 {
-    frameL *s = (frameL*)luaL_checkudata(L, 1, FRAME);
+    luaL_checkudata(L, 1, FRAME);
     const gchar* field = luaL_checkstring(L, 2);
 
-    CASE_FUNC(L, field, get_name,   frame);
-    CASE_FUNC(L, field, set_name,   frame);
-    CASE_FUNC(L, field, get_label,  frame);
-    CASE_FUNC(L, field, set_label,  frame);
+    INDEX_FIELD(image,  frame);
 
-    CASE_FUNC(L, field, load,       frame);
-    CASE_FUNC(L, field, clear,      frame);
+    INDEX_FIELD(name,   frame);
+    INDEX_FIELD(label,  frame);
+    INDEX_FIELD(shadow, frame);
+
+    CASE_FUNC(size_request,   frame);
+    CASE_FUNC(preferred_size, frame);
+
     return 1;
+}
+static int newindex_frameL(lua_State *L)
+{
+    luaL_checkudata(L, 1, FRAME);
+    const gchar* field = luaL_checkstring(L, 2);
+
+    NEWINDEX_FIELD(image,  frame);
+
+    NEWINDEX_FIELD(name,   frame);
+    NEWINDEX_FIELD(label,  frame);
+    NEWINDEX_FIELD(shadow, frame);
+
+    return 0;
 }
 
 static const struct luaL_Reg frameLlib_f [] =
@@ -107,14 +195,16 @@ static const struct luaL_Reg frameLlib_f [] =
 };
 static const struct luaL_Reg frameLlib_m [] =
 {
-    {"__gc",    gc_frameL   },
-    {"__index", index_frameL},
-    {NULL,      NULL        }
+    {"__gc",       gc_frameL      },
+    {"__index",    index_frameL   },
+    {"__newindex", newindex_frameL},
+    {"__tostring", tostring_frameL},
+    {NULL,         NULL           }
 };
-int luaopen_frameL(lua_State *L, const gchar* name)
+int luaopen_frameL(lua_State *L)
 {
     luaL_newmetatable(L, FRAME);
     luaL_setfuncs(L, frameLlib_m, 0);
-    luaL_newlib(L, frameLlib_f, name);
+    luaL_newlib(L, frameLlib_f, FRAME);
     return 1;
 }

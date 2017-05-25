@@ -9,14 +9,13 @@
 
 #define APPNAME "liv"
 
-#define APP    "app"
-#define FRAME  "frame"
-#define IMAGE  "image"
-#define GRID   "grid"
-#define SCROLL "scroll"
+#define APP     "app"
+#define FRAME   "frame"
+#define IMAGE   "image"
+#define GRID    "grid"
 
-GtkWindow* window;
-GtkFrame*  content;
+GtkWindow*         window;
+GtkScrolledWindow* scroll;
 
 GtkBox*    statusbox;
 GtkLabel*  status_left;

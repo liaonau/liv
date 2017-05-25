@@ -1,6 +1,6 @@
 --{{{G, opts     : глобальные переменные
 rex = require('rex_pcre')
-picture = scroll.new()
+picture = frame.new()
 preview = grid.new()
 pics = {}
 --{{{ опции
@@ -27,13 +27,11 @@ setmetatable(_G, {--{{{
         elseif (k == 'IMG') then return pics[state.idx].image
         elseif (k == 'TMB') then return pics[state.idx].thumb
         elseif (k == 'PIC') then return pics[state.idx]
-        elseif (k == 'DSP') then return state.display
         else return rawget(t, k)
         end
     end,
     __newindex = function(t, k, v)
         if     (k == 'IDX') then state.idx     = v
-        elseif (k == 'DSP') then state.display = v
         else                rawset(t, k, v)
         end
     end,
@@ -52,7 +50,6 @@ setmetatable(
 
     idx     = 1,
     picixd  = 0,
-    display = nil,
 },
 {__index = function(t, k) return PIC[k] end})
 --}}}
@@ -92,28 +89,28 @@ resize = function(s) --{{{
     s = math.min(thumbs.max_size, s)
     s = math.max(thumbs.min_size, s)
     thumbs.size = s
-    for i, p in ipairs(pics) do
-        if (not dims.native_fits(p.thumb, s, s)) then
-            p.thumb:scale(dims.inscribe(p.thumb, s, s))
+    for _, p in ipairs(pics) do
+        p.thumb:size_request(s, s)
+        local i = p.thumb.image
+        if (not dims.native_fits(i, s, s)) then
+            i:scale(dims.inscribe(i, s, s))
         else
-            p.thumb:scale(dims.native(p.thumb))
+            i:scale(dims.native(i))
         end
     end
 end,
 --}}}
 regrid = function() --{{{
-    local items, size = preview:get_size()
-    if (items ~= #pics or size ~= thumbs.size) then
-        preview:set_size(#pics, thumbs.size)
+    local psw, psh = 1, 1
+    for _, pic in ipairs(pics) do
+        local t = pic.thumb
+        local d, n, e = texter.split_path(pic.path)
+        t.label = n..(e == '' and '' or '.'..e)
+        local w, h = t:preferred_size()
+        psw = math.max(psw, w)
+        psh = math.max(psh, h)
     end
-    for idx = 1, #pics do
-        local d, n, e = texter.split_path(pics[idx].path)
-        preview:set_label(idx, n..(e == '' and '' or '.'..e))
-        --preview:set_label(idx, d..n..(e == '' and '' or '.'..e))
-        preview:load(idx, pics[idx].thumb, true)
-    end
-    local psw, psh = preview:preferred_size()
-    local cw,  ch  = app:content_size()
+    local cw, ch = app:content_size()
     print(cw, ch)
     local spc = preview.spacing
     local fw, fh = psw + spc.row, psh + spc.column
@@ -122,11 +119,10 @@ regrid = function() --{{{
     local c = math.min(math.ceil(#pics / r), math.floor(ch / fh))
     print(psw, psh)
     local v = r * c
-    for idx = 1, #pics do
-    --for idx = 1, math.min(v, #pics) do
+    for idx, pic in ipairs(pics) do
         local l = (idx - 1) % r + 1
         local t = (idx - l) / r + 1
-        preview:attach(idx, l, t)
+        preview:attach(pic.thumb, l, t)
     end
 end,
 --}}}
@@ -135,12 +131,12 @@ end,
 --{{{ init        : начальный вызов
 init = function(...)
     app.title = app.name
-    app:style(css)
+    app.style(css)
     args = {...}
 --{{{ читаем файлы
     local max_w, max_h = 1, 1
     for n, path in ipairs(args) do
-        if (not app:is_file(path)) then
+        if (not app.is_file(path)) then
             io.stderr:write('warning: «'..path..'» is not a regular file\n')
         else
             local memorize = true
@@ -180,8 +176,10 @@ init = function(...)
         if (not dims.native_fits(tmp, thumbs.max_size, thumbs.max_size)) then
             tmp:scale(dims.inscribe(tmp, thumbs.max_size, thumbs.max_size))
         end
-        pic.thumb = tmp:fork()
-        tmp       = nil
+        print(tmp.path)
+        pic.thumb = frame.new()
+        pic.thumb.image = tmp:fork()
+        tmp = nil
     end
     collectgarbage()
     thumbler.resize(thumbs.size)
@@ -270,7 +268,7 @@ set_status = function() --{{{
     local W, H = IMG.native_width, IMG.native_height
     local zw, zh = 100 * (w / W), 100 * (h / H)
 
-    local is_preview = (tostring(DSP) == tostring(preview))
+    local is_preview = (app.display == preview)
     local mode  = mkup.m('mode:')..(is_preview and 'preview ['..thumbs.size..'px]' or 'picture')
     local idx   = mkup.m('№:')..(IMG.broken and mkup.r(IDX) or mkup.g(IDX))..' of '..#pics
     local mkd   = cond(state.marked, mkup.y('mark'));
@@ -283,9 +281,15 @@ set_status = function() --{{{
     local imgst = cond((not is_preview), mkup.m('state:')..texter.image_state_name(IMG))
     local scale = cond(not is_preview, mkup.m('scale:')..'['..w..'x'..h..']px('..math.round(zw)..'x'..math.round(zh)..')%')
     local scs   = cond(texter.success_state.set, (texter.success_state.val and mkup.g or mkup.r)(texter.success_state.msg))
-    local mem   = mkup.y(mkup.monospace(IMG.memorize and 'm' or 'd'))
-    app.status_left  = mode..spc ..idx..spc ..mem..spc ..mkd..spc ..size..spc ..scs
-    app.status_right = pos..spc ..imgst..spc ..scale ..pfx
+    local mem   = mkup.y(mkup.monospace(IMG.memorized and 'm' or 'd'))
+    local left  = mode..spc ..idx..spc ..mem..spc ..mkd..spc ..size..spc ..scs
+    local right = pos..spc ..imgst..spc ..scale ..pfx
+    app.status  =
+    {
+        visible = app.status.visible,
+        left    = left,
+        right   = right,
+    }
 end,
 --}}}
 update = function()--{{{
@@ -334,15 +338,14 @@ end,
 viewer =
 {
 update_picture = function()--{{{
-    if (DSP == picture and state.picixd ~= IDX) then
-        picture:load(IMG, not IMG.memorize)
+    if (app.display == picture and state.picixd ~= IDX) then
+        picture.image = IMG
         state.picixd = IDX
-        --print('теперь № '..IDX)
     end
 end,
 --}}}
 update_preview = function()--{{{
-    if (DSP ~= preview) then
+    if (app.display ~= preview) then
         return
     end
     preview:clear()
@@ -400,21 +403,19 @@ end,
 --}}}
 
 toggle_display = function() --{{{
-    if (DSP == preview) then
+    if (app.display == preview) then
         viewer.show_picture()
-    elseif (DSP == picture) then
+    elseif (app.display == picture) then
         viewer.show_preview()
     end
 end,
 --}}}
 show_preview = function()--{{{
-    DSP = preview
-    app:display(preview)
+    app.display = preview
 end,
 --}}}
 show_picture = function() --{{{
-    DSP = picture
-    app:display(picture)
+    app.display = picture
     viewer.update_picture()
 end,
 --}}}
@@ -444,7 +445,7 @@ end,
 --}}}
 
 toggle_status = function()--{{{
-    app.status_visible = not app.status_visible
+    app.status = {visible = not app.status.visible}
 end,
 --}}}
 }
@@ -588,9 +589,8 @@ transformer =
 {
 perform = function(i, func, ...)--{{{
     i[func](i, ...)
-    if (i == IMG and DSP == picture) then
-        picture:load(i, false)
-        i = nil
+    if (i == IMG and app.display == picture) then
+        picture.image = i
     end
 end,
 --}}}
@@ -637,44 +637,39 @@ scale_in_window_if_larger = function(i) if (not dims.content_fits(i)) then trans
 rotate = function(i, clockwise)  transformer.perform(i, 'rotate', clockwise) end,
 flip   = function(i, horizontal) transformer.perform(i, 'flip', horizontal)  end,
 reset  = function(i)             transformer.perform(i, 'reset')             end,
-
-reload = function(i)--{{{
-    local m = i.memorize
-    i:memorize()
-    if (not m) then
-        i:unmemorize()
-    end
-end,
---}}}
 }
 --}}}
 --{{{scroller    : скроллинг
 scroller =
 {
 percent = function(hor, ver) --{{{
-    local hs, vs, min_hs, min_vs, max_hs, max_vs = picture:get_scroll()
-    picture:set_scroll(
+    local s = app.scroll
+    app.scroll =
     {
-        h = hs + max_hs * hor / 100,
-        v = vs + max_vs * ver / 100,
-    })
+        h = s.h + s.max_h * hor / 100,
+        v = s.v + s.max_v * ver / 100,
+    }
 end,
 --}}}
 center = function()--{{{
-    local hs, vs, min_hs, min_vs, max_hs, max_vs = picture:get_scroll()
-    picture:set_scroll(
+    local s = app.scroll
+    app.scroll =
     {
-        h = 0.5 * (max_hs - min_hs),
-        v = 0.5 * (max_vs - min_vs),
-    })
+        h = 0.5 * (s.max_h - s.min_h),
+        v = 0.5 * (s.max_v - s.min_v),
+    }
 end,
 --}}}
---preview = function(left_step, top_step) --{{{
-    --local spacing = preview.spacing
-    --local alloc   = thumbs.max_alloc()
-    --app.hscroll = app.hscroll + left_step*(alloc.width + spacing.row)
-    --app.vscroll = app.vscroll + top_step*(alloc.height + spacing.column)
---end,
+preview = function(left_step, top_step) --{{{
+    local spacing = preview.spacing
+    local alloc   = thumbs.max_alloc()
+    local scr = app.scroll
+    app.scroll =
+    {
+        h = scr.h + left_step*(alloc.width + spacing.row),
+        v = scr.v + top_step*(alloc.height + spacing.column),
+    }
+end,
 ----}}}
 --preview_set = function(left, top) --{{{
     --local spacing = preview.spacing
@@ -807,7 +802,7 @@ match = function(hotkey, name, mods)--{{{
 end,
 --}}}
 find = function(mods, name, value) --{{{
-    for _, tab in pairs({"any", DSP}) do
+    for _, tab in pairs({"any", app.display}) do
         for _, hotkey in ipairs(hotkeys[tab]) do
             if (steward.match(hotkey, name, mods)) then
                 return hotkey
@@ -862,9 +857,9 @@ hotkeys =
         {{         }, "space",     function() navigator.next()  end},
         {{         }, "BackSpace", function() navigator.prev()  end},
 
-        {{"Shift"  }, "Q",      function() app:quit() end},
-        {{         }, "q",      function() marker.print(); app:quit() end},
-        {{"Shift"  }, "Return", function() marker.print(); app:quit() end},
+        {{"Shift"  }, "Q",      function() app.quit() end},
+        {{         }, "q",      function() marker.print(); app.quit() end},
+        {{"Shift"  }, "Return", function() marker.print(); app.quit() end},
 
         {{         }, "t",      function() viewer.toggle_display() end},
         {{         }, "Return", function() viewer.toggle_display() end},

@@ -1,10 +1,11 @@
 #include "conf.h"
 #include "util.h"
+#include "inlined.h"
 
+#include "appL.h"
 #include "imageL.h"
 #include "gridL.h"
-#include "scrollL.h"
-#include "appL.h"
+#include "frameL.h"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -16,11 +17,10 @@ static lua_State* init_lua_State(void)
     if (L == NULL)
         return NULL;
     luaL_openlibs(L);
-    luaopen_appL(   L, APP);
-    luaopen_frameL( L, FRAME);
-    luaopen_imageL( L, IMAGE);
-    luaopen_gridL(  L, GRID);
-    luaopen_scrollL(L, SCROLL);
+    luaopen_appL(L);
+    luaopen_frameL(L);
+    luaopen_imageL(L);
+    luaopen_gridL(L);
     return L;
 }
 static int luaH_traceback(lua_State *L)
@@ -91,7 +91,7 @@ static void cb_size(GtkWidget *widget, GdkRectangle *rect, gpointer data)
         {
             if (GTK_IS_WINDOW(data))
                 lua_pushstring(L, "window");
-            else if (GTK_IS_FRAME(data))
+            else if (GTK_IS_SCROLLED_WINDOW(data))
                 lua_pushstring(L, "content");
             else
                 lua_pushstring(L, "other");
@@ -179,28 +179,37 @@ gint main(gint argc, gchar **argv)
 
     GtkBox* mainbox;
     mainbox   = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
-    content   = (GtkFrame*)gtk_frame_new(NULL);
     statusbox = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    gtk_frame_set_shadow_type(content, GTK_SHADOW_NONE);
-    gtk_widget_set_hexpand((GtkWidget*)content, TRUE);
-    gtk_widget_set_vexpand((GtkWidget*)content, TRUE);
-    gtk_widget_set_name((GtkWidget*)content,   "content");
+    scroll    = (GtkScrolledWindow*)gtk_scrolled_window_new(NULL, NULL);
+
+    gtk_widget_set_hexpand((GtkWidget*)scroll, TRUE);
+    gtk_widget_set_vexpand((GtkWidget*)scroll, TRUE);
+    gtk_scrolled_window_set_policy(scroll, GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+
+    gtk_widget_set_name((GtkWidget*)scroll,    "content");
     gtk_widget_set_name((GtkWidget*)statusbox, "status");
-    gtk_box_pack_start(mainbox, (GtkWidget*)content,   TRUE,  TRUE,  0);
+
+    gtk_box_pack_start(mainbox, (GtkWidget*)scroll,    TRUE,  TRUE,  0);
     gtk_box_pack_end(  mainbox, (GtkWidget*)statusbox, FALSE, FALSE, 0);
 
-    status_left  = (GtkLabel*)gtk_label_new("");
-    status_right = (GtkLabel*)gtk_label_new("");
-    gtk_label_set_xalign(status_left,  0);
-    gtk_label_set_xalign(status_right, 1);
-    gtk_label_set_line_wrap(status_left,  TRUE);
-    gtk_label_set_line_wrap(status_right, TRUE);
-    gtk_widget_set_name((GtkWidget*)status_left,  "status_left");
-    gtk_widget_set_name((GtkWidget*)status_right, "status_right");
+#define NEW_LABEL(label, align)                                  \
+    {                                                            \
+        label = (GtkLabel*)gtk_label_new("");                    \
+        gtk_label_set_xalign((label), (align));                  \
+        gtk_label_set_ellipsize((label), PANGO_ELLIPSIZE_START); \
+        gtk_label_set_line_wrap((label), FALSE);                 \
+        gtk_widget_set_name((GtkWidget*)(label), #label);        \
+    }
+    NEW_LABEL(status_left,  0);
+    NEW_LABEL(status_right, 1);
+
     gtk_box_pack_start(statusbox, (GtkWidget*)status_left,  TRUE,  TRUE,  0);
     gtk_box_pack_end(  statusbox, (GtkWidget*)status_right, FALSE, FALSE, 0);
 
     gtk_container_add(GTK_CONTAINER(window), (GtkWidget*)mainbox);
+
+    if (!init_inlined_objects())
+        fatal("can't init inlined resources");
 
     lua_State* L = init_lua_State();
     if (!L)
@@ -215,10 +224,10 @@ gint main(gint argc, gchar **argv)
         lua_pushstring(L, argv[i]);
     luaH_pcall(L, argc - 1, 0);
 
-    g_signal_connect(window,  "destroy",         G_CALLBACK(gtk_main_quit), (gpointer)L);
-    g_signal_connect(window,  "key-press-event", G_CALLBACK(cb_key),        (gpointer)L);
-    g_signal_connect(window,  "size-allocate",   G_CALLBACK(cb_size),       (gpointer)L);
-    g_signal_connect(content, "size-allocate",   G_CALLBACK(cb_size),       (gpointer)L);
+    g_signal_connect(window, "destroy",         G_CALLBACK(gtk_main_quit), (gpointer)L);
+    g_signal_connect(window, "key-press-event", G_CALLBACK(cb_key),        (gpointer)L);
+    g_signal_connect(window, "size-allocate",   G_CALLBACK(cb_size),       (gpointer)L);
+    g_signal_connect(scroll, "size-allocate",   G_CALLBACK(cb_size),       (gpointer)L);
 
     gtk_widget_show_all((GtkWidget*)window);
     gtk_main();

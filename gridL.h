@@ -4,13 +4,8 @@
 
 typedef struct gridL
 {
-    GtkScrolledWindow* scroll;
-    GtkGrid*           grid;
-    GPtrArray*         frames;
-    gint               size;
-    gint               rows;
-    gint               cols;
+    GtkGrid*   grid;
 }
 gridL;
 
-int luaopen_gridL(lua_State*, const gchar*);
+int luaopen_gridL(lua_State*);

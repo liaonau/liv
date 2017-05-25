@@ -4,20 +4,21 @@
 
 typedef struct imageL
 {
-    GdkPixbuf*       pxb;
     gchar*           path;
-    gboolean         memorize;
-    gboolean         broken;
+
     GdkPixbufFormat* format;
+    GdkPixbuf*       pxb;
+
+    gint             native_width;
+    gint             native_height;
+
     guint8           state;
     gint             width;
     gint             height;
-    gint             native_width;
-    gint             native_height;
 }
 imageL;
 
 GdkPixbuf* image_get_pixbuf(imageL*);
-int luaopen_imageL(lua_State*, const gchar*);
+int luaopen_imageL(lua_State*);
 
 GdkPixbuf* BROKENpxb;

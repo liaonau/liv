@@ -1,11 +1,8 @@
 #include "luaL.h"
 #include "util.h"
 #include "imageL.h"
-#include "resource.h"
-#include "idle.h"
-
-/*static GdkPixbuf*       BROKENpxb;*/
-static GdkPixbufFormat* PNGformat;
+#include "inlined.h"
+/*#include "idle.h"*/
 
 //таблица умножения группы четырех вращений и вертикального и горизонтального отражения
 //a0-a3 — вращения, a4,a6 — горизонтальные и вертикальные отражения
@@ -20,14 +17,24 @@ static const guint8 states[8][8] =
     {6, 7, 4, 5, 2, 3, 0, 1},
     {7, 4, 5, 3, 1, 2, 3, 1}
 };
-static inline void state_change(imageL* i, guint8 action)
+static inline void image_state_change(imageL* i, guint8 action)
 {
     i->state = states[action][i->state];
 }
-static inline void scale_change(imageL* i, gint width, gint height)
+static inline void image_scale_change(imageL* i, gint width, gint height)
 {
     i->width  = MAX(1, width);
     i->height = MAX(1, height);
+}
+static inline void image_to_native(imageL* i)
+{
+    i->state  = 0;
+    i->width  = i->native_width;
+    i->height = i->native_height;
+}
+static inline void image_reset(imageL* i)
+{
+    image_to_native(i);
 }
 
 static inline gboolean image_is_swapped(imageL* i)
@@ -36,11 +43,11 @@ static inline gboolean image_is_swapped(imageL* i)
 }
 static inline gboolean image_is_broken(imageL* i)
 {
-    return (i->broken);
+    return (i->format == NULL);
 }
 static inline gboolean image_is_memorized(imageL* i)
 {
-    return (i->memorize);
+    return (i->pxb && GDK_IS_PIXBUF(i->pxb));
 }
 static inline gboolean image_is_writable(imageL* i)
 {
@@ -50,57 +57,45 @@ static inline const gchar* image_format_name(imageL* i)
 {
     return (image_is_broken(i) ? NULL : gdk_pixbuf_format_get_name(i->format));
 }
+static inline void image_pixbuf_unref(imageL* i)
+{
+    if (i->pxb)
+        g_object_unref(i->pxb);
+}
 
 static void image_set_broken(imageL* i)
 {
-    if (!i->broken)
-        g_object_ref(BROKENpxb);
-    i->broken        = TRUE;
-    if (i->memorize)
-    i->pxb           = BROKENpxb;
-    i->native_width  = gdk_pixbuf_get_width(BROKENpxb);
-    i->native_height = gdk_pixbuf_get_height(BROKENpxb);
+    gboolean was_broken = image_is_broken(i);
+    image_pixbuf_unref(i);
+    i->pxb           = NULL;
+    i->native_width  = 1;
+    i->native_height = 1;
     i->format        = NULL;
-    i->state         = 0;
-    i->width         = i->native_width;
-    i->height        = i->native_height;
-}
-static void image_set_not_broken(imageL* i)
-{
-    if (i->broken)
-    {
-        g_object_unref(BROKENpxb);
-        i->state  = 0;
-        i->width  = i->native_width;
-        i->height = i->native_height;
-    }
-    if (!i->memorize)
-        i->pxb = NULL;
-    i->broken = FALSE;
+    if (!was_broken)
+        image_to_native(i);
 }
 static void image_update_info(imageL* i)
 {
+    gboolean was_broken = image_is_broken(i);
     i->format = gdk_pixbuf_get_file_info(i->path, &i->native_width, &i->native_height);
-    if (G_UNLIKELY(!i->format))
+    if (G_UNLIKELY(image_is_broken(i)))
         image_set_broken(i);
     else
-        image_set_not_broken(i);
+        if (was_broken)
+            image_to_native(i);
 }
+
 static GdkPixbuf* image_pixbuf_from_file(imageL* i)
 {
-    return gdk_pixbuf_new_from_file(i->path, NULL);
+    image_update_info(i);
+    if (image_is_broken(i))
+        return NULL;
+    GdkPixbuf* pxb = gdk_pixbuf_new_from_file(i->path, NULL);
+    if (!GDK_IS_PIXBUF(pxb))
+        return NULL;
+    return pxb;
 }
-#define IMAGE_GET_FILED_PIXBUF(i, pxb) \
-{\
-    pxb = gdk_pixbuf_new_from_file(((i)->path), NULL); \
-    if (G_UNLIKELY(!GDK_IS_PIXBUF((pxb)))) \
-    { \
-        image_set_broken((i));\
-        g_object_ref(BROKENpxb);\
-        return BROKENpxb;\
-    } \
-}
-static inline GdkPixbuf* image_get_scaled_pixbuf(imageL *i, GdkPixbuf* startpxb)
+static inline GdkPixbuf* image_get_scaled_pixbuf(imageL* i, GdkPixbuf* startpxb)
 {
     GdkPixbuf* pxb;
     gint w = gdk_pixbuf_get_width(startpxb);
@@ -115,7 +110,7 @@ static inline GdkPixbuf* image_get_scaled_pixbuf(imageL *i, GdkPixbuf* startpxb)
     g_object_unref(startpxb);
     return pxb;
 }
-static inline GdkPixbuf* image_get_stated_pixbuf(imageL *i, GdkPixbuf* startpxb)
+static inline GdkPixbuf* image_get_stated_pixbuf(imageL* i, GdkPixbuf* startpxb)
 {
     GdkPixbuf* pxb;
     GdkPixbuf* tmppxb;
@@ -161,31 +156,16 @@ GdkPixbuf* image_get_pixbuf(imageL* i)
     GdkPixbuf* nativepxb;
     GdkPixbuf* tmppxb;
 
-    if (i->memorize)
+    if (image_is_memorized(i))
     {
-        if (G_LIKELY(i->pxb))
-        {
-            nativepxb = i->pxb;
-            g_object_ref(nativepxb);
-            if (i->broken)
-                return nativepxb;
-        }
-        else //deferred, потенциально не единожды прочитанный файл ☹
-        {
-            info("плохо, лишняя работа с «%s»", i->path);
-            IMAGE_GET_FILED_PIXBUF(i, nativepxb);
-        }
+        nativepxb = i->pxb;
+        g_object_ref(nativepxb);
     }
     else
     {
-        image_update_info(i);
-        if (G_UNLIKELY(i->broken))
-        {
-            g_object_ref(BROKENpxb);
-            return BROKENpxb;
-        }
-        else
-            IMAGE_GET_FILED_PIXBUF(i, nativepxb);
+        nativepxb = image_pixbuf_from_file(i);
+        if (!GDK_IS_PIXBUF(nativepxb))
+            return NULL;
     }
 
     tmppxb = image_get_scaled_pixbuf(i, nativepxb);
@@ -198,16 +178,16 @@ static int new_imageL(lua_State *L)
     imageL* i = (imageL*)lua_newuserdata(L, sizeof(imageL));
     const gchar* path = luaL_checkstring(L, 1);
     gboolean memorize = lua_toboolean(L, 2);
-    i->memorize = memorize;
-    i->path     = g_strdup(path);
-    i->pxb      = NULL;
-    i->broken   = FALSE;
+    i->path  = g_strdup(path);
+    i->state = 0;
+    i->pxb   = NULL;
     image_update_info(i);
-    i->width  = i->native_width;
-    i->height = i->native_height;
-    i->state  = 0;
-    if (i->memorize && !image_is_broken(i))
-        idle_pixbuf(i, &image_pixbuf_from_file, i, &image_set_broken);
+    if (!image_is_broken(i))
+        image_to_native(i);
+    /*if (memorize && !image_is_broken(i))*/
+        /*idle_pixbuf(i, &image_pixbuf_from_file);*/
+    if (memorize)
+        i->pxb = image_pixbuf_from_file(i);
     luaL_getmetatable(L, IMAGE);
     lua_setmetatable(L, -2);
     return 1;
@@ -233,7 +213,7 @@ static int rotate_imageL(lua_State* L)
     gboolean clockwise = lua_toboolean(L, 2);
 
     guint8 action = (clockwise ? 1 : 3);
-    state_change(i, action);
+    image_state_change(i, action);
     return 0;
 }
 static int flip_imageL(lua_State* L)
@@ -242,7 +222,7 @@ static int flip_imageL(lua_State* L)
     gboolean horizontal = lua_toboolean(L, 2);
 
     guint action = (horizontal) ? 4 : 6;
-    state_change(i, action);
+    image_state_change(i, action);
     return 0;
 }
 static int set_state_imageL(lua_State* L)
@@ -250,15 +230,7 @@ static int set_state_imageL(lua_State* L)
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     guint8 state = luaL_checkinteger(L, 2);
 
-    state_change(i, state);
-    return 0;
-}
-static int reset_imageL(lua_State* L)
-{
-    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
-    i->state  = 0;
-    i->width  = i->native_width;
-    i->height = i->native_height;
+    image_state_change(i, state);
     return 0;
 }
 static int scale_imageL(lua_State* L)
@@ -266,7 +238,27 @@ static int scale_imageL(lua_State* L)
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     gint width  = luaL_checkinteger(L, 2);
     gint height = luaL_checkinteger(L, 3);
-    scale_change(i, width, height);
+    image_scale_change(i, width, height);
+    return 0;
+}
+static int reset_imageL(lua_State* L)
+{
+    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
+    image_reset(i);
+    return 0;
+}
+
+static int in_memory_imageL(lua_State* L)
+{
+    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
+    i->pxb = image_pixbuf_from_file(i);
+    return 0;
+}
+static int out_memory_imageL(lua_State* L)
+{
+    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
+    image_pixbuf_unref(i);
+    i->pxb = image_pixbuf_from_file(i);
     return 0;
 }
 
@@ -275,9 +267,8 @@ static int fork_imageL(lua_State *L)
     imageL* p = (imageL*)luaL_checkudata(L, 1, IMAGE);
     imageL* i = (imageL*)lua_newuserdata(L, sizeof(imageL));
     i->path          = g_strdup(p->path);
-    idle_pixbuf(i, &image_get_pixbuf, p, NULL);
-    i->memorize      = p->memorize;
-    i->broken        = p->broken;
+    /*idle_pixbuf(i, &image_get_pixbuf, p, NULL);*/
+    i->pxb           = image_get_pixbuf(p);
     i->format        = p->format;
     i->native_width  = p->width;
     i->native_height = p->height;
@@ -288,21 +279,6 @@ static int fork_imageL(lua_State *L)
     lua_setmetatable(L, -2);
     return 1;
 }
-/*static imageL* image_clone(lua_State* L, imageL* i)*/
-/*{*/
-    /*imageL* c = (imageL*)lua_newuserdata(L, sizeof(imageL));*/
-    /*c->path          = g_strdup(i->path);*/
-    /*c->pxb           = i->pxb;*/
-    /*c->memorize      = i->memorize;*/
-    /*c->broken        = i->broken;*/
-    /*c->native_width  = i->native_width;*/
-    /*c->native_height = i->native_height;*/
-    /*c->width         = i->width;*/
-    /*c->height        = i->height;*/
-    /*c->state         = i->state;*/
-    /*luaL_getmetatable(L, IMAGE);*/
-    /*lua_setmetatable(L, -2);*/
-/*}*/
 static int dump_imageL(lua_State* L)
 {
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
@@ -346,11 +322,7 @@ static int gc_imageL(lua_State *L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     g_free(i->path);
-    if (i->pxb)
-    {
-        g_object_unref(i->pxb);
-        i->pxb = NULL;
-    }
+    image_pixbuf_unref(i);
     return 0;
 }
 static int index_imageL(lua_State *L)
@@ -358,64 +330,50 @@ static int index_imageL(lua_State *L)
     imageL *i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     const gchar* field = luaL_checkstring(L, 2);
 
-    CASE_NUM( L, field, width,         i->width);
-    CASE_NUM( L, field, height,        i->height);
-    CASE_NUM( L, field, native_width,  i->native_width);
-    CASE_NUM( L, field, native_height, i->native_height);
-    CASE_NUM( L, field, state,         i->state);
-    CASE_BOOL(L, field, swapped,       image_is_swapped(i));
-    CASE_BOOL(L, field, broken,        image_is_broken(i));
-    CASE_BOOL(L, field, writeable,     image_is_writable(i));
-    CASE_BOOL(L, field, memorize,      image_is_memorized(i));
-    CASE_STR( L, field, format,        image_format_name(i));
+    CASE_STR(  path,          i->path               );
+    CASE_NUM(  width,         i->width              );
+    CASE_NUM(  height,        i->height             );
+    CASE_NUM(  native_width,  i->native_width       );
+    CASE_NUM(  native_height, i->native_height      );
+    CASE_NUM(  state,         i->state              );
+    CASE_BOOL( swapped,       image_is_swapped(i)   );
+    CASE_BOOL( broken,        image_is_broken(i)    );
+    CASE_BOOL( writeable,     image_is_writable(i)  );
+    CASE_BOOL( memorized,     image_is_memorized(i) );
+    CASE_STR(  format,        image_format_name(i)  );
 
-    CASE_FUNC(L, field, rotate,    image);
-    CASE_FUNC(L, field, flip,      image);
-    CASE_FUNC(L, field, set_state, image);
-    CASE_FUNC(L, field, scale,     image);
-    CASE_FUNC(L, field, reset,     image);
+    CASE_FUNC( rotate,     image);
+    CASE_FUNC( flip,       image);
+    CASE_FUNC( set_state,  image);
+    CASE_FUNC( scale,      image);
+    CASE_FUNC( reset,      image);
 
-    CASE_FUNC(L, field, fork,      image);
-    CASE_FUNC(L, field, dump,      image);
+    CASE_FUNC( in_memory,  image);
+    CASE_FUNC( out_memory, image);
+
+    CASE_FUNC( fork,       image);
+    CASE_FUNC( dump,       image);
 
     return 1;
 }
 
 static const struct luaL_Reg imageLlib_f [] =
 {
-    {"new",   new_imageL },
-    {"info",  info_imageL},
-    {NULL,    NULL       }
+    {"new",  new_imageL },
+    {"info", info_imageL},
+    {NULL,   NULL       }
 };
 static const struct luaL_Reg imageLlib_m [] =
 {
-    {"__gc",       gc_imageL      },
-    {"__index",    index_imageL   },
-    {NULL,         NULL           }
+    {"__gc",    gc_imageL   },
+    {"__index", index_imageL},
+    {NULL,      NULL        }
 };
-int luaopen_imageL(lua_State *L, const gchar* name)
+int luaopen_imageL(lua_State *L)
 {
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    #pragma GCC diagnostic push
-    BROKENpxb = gdk_pixbuf_new_from_inline(-1, inline_broken, FALSE, NULL);
-    #pragma GCC diagnostic pop
-    GSList* formats = gdk_pixbuf_get_formats();
-    GSList* f = formats;
-    while(f)
-    {
-        GdkPixbufFormat* format = (GdkPixbufFormat*)f->data;
-        if (g_strcmp0(gdk_pixbuf_format_get_name(format), "png") == 0)
-        {
-            PNGformat = format;
-            break;
-        }
-        f = f->next;
-    }
-    g_slist_free(formats);
-
     luaL_newmetatable(L, IMAGE);
     luaL_setfuncs(L, imageLlib_m, 0);
-    luaL_newlib(L, imageLlib_f, name);
+    luaL_newlib(L, imageLlib_f, IMAGE);
     return 1;
 }
 
