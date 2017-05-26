@@ -101,47 +101,47 @@ static int status_set_appL(lua_State *L)
 
 static int scroll_get_appL(lua_State *L)
 {
-    GtkAdjustment* hadj = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
-    GtkAdjustment* vadj = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
+    GtkAdjustment* hor_adjustment = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
+    GtkAdjustment* ver_adjustment = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
     lua_newtable(L);
-    gdouble hscroll = gtk_adjustment_get_value(hadj);
-    lua_pushnumber(L, hscroll);
-    lua_setfield(L, -2, "h");
-    gdouble vscroll = gtk_adjustment_get_value(vadj);
-    lua_pushnumber(L, vscroll);
-    lua_setfield(L, -2, "v");
-    gdouble min_hscroll = gtk_adjustment_get_lower(hadj);
-    lua_pushnumber(L, min_hscroll);
-    lua_setfield(L, -2, "min_h");
-    gdouble min_vscroll = gtk_adjustment_get_lower(vadj);
-    lua_pushnumber(L, min_vscroll);
-    lua_setfield(L, -2, "min_v");
-    gdouble max_hscroll = gtk_adjustment_get_upper(hadj);
-    lua_pushnumber(L, max_hscroll);
-    lua_setfield(L, -2, "max_h");
-    gdouble max_vscroll = gtk_adjustment_get_upper(vadj);
-    lua_pushnumber(L, max_vscroll);
-    lua_setfield(L, -2, "max_v");
+#define GET_ADJ(direction, type, field)                            \
+    {                                                              \
+        gdouble val;                                               \
+        val = gtk_adjustment_get_##type(direction##_##adjustment); \
+        lua_pushnumber(L, val);                                    \
+        lua_setfield(L, -2, field);                                \
+    }
+    GET_ADJ(hor, value, "h");
+    GET_ADJ(ver, value, "v");
+    GET_ADJ(hor, lower, "min_h");
+    GET_ADJ(ver, lower, "min_v");
+    GET_ADJ(hor, upper, "max_h");
+    GET_ADJ(ver, upper, "max_v");
     return 1;
 }
 static int scroll_set_appL(lua_State *L)
 {
     if (lua_istable(L, 2))
     {
-        GtkAdjustment* hadj = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
-        GtkAdjustment* vadj = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
-        gdouble hscroll = gtk_adjustment_get_value(hadj);
-        gdouble vscroll = gtk_adjustment_get_value(vadj);
-        lua_getfield(L, 2, "h");
-        gdouble h = luaL_optnumber(L, -1, gtk_adjustment_get_value(hadj));
-        lua_pop(L, 1);
-        lua_getfield(L, 2, "v");
-        gdouble v = luaL_optnumber(L, -1, gtk_adjustment_get_value(vadj));
-        lua_pop(L, 1);
-        if (h != hscroll)
-            gtk_adjustment_set_value(hadj, h);
-        if (v != vscroll)
-            gtk_adjustment_set_value(vadj, v);
+        GtkAdjustment* hor_adjustment = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
+        GtkAdjustment* ver_adjustment = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
+#define SET_ADJ(direction, type, field)                                   \
+        {                                                                 \
+            gdouble tmp, val;                                             \
+            tmp = gtk_adjustment_get_##type(direction##_##adjustment);    \
+            lua_getfield(L, 2, field);                                    \
+            val = luaL_optnumber(L, -1, tmp);                             \
+            lua_pop(L, 1);                                                \
+            if (tmp != val)                                               \
+                gtk_adjustment_set_##type(direction##_##adjustment, val); \
+        }
+
+        SET_ADJ(hor, value, "h");
+        SET_ADJ(ver, value, "v");
+        SET_ADJ(hor, lower, "min_h");
+        SET_ADJ(ver, lower, "min_v");
+        SET_ADJ(hor, upper, "max_h");
+        SET_ADJ(ver, upper, "max_v");
     }
     return 0;
 }

@@ -89,17 +89,11 @@ static void cb_size(GtkWidget *widget, GdkRectangle *rect, gpointer data)
         lua_getfield(L, -1, "size");
         if (lua_isfunction(L, -1))
         {
-            if (GTK_IS_WINDOW(data))
-                lua_pushstring(L, "window");
-            else if (GTK_IS_SCROLLED_WINDOW(data))
-                lua_pushstring(L, "content");
-            else
-                lua_pushstring(L, "other");
             lua_pushnumber(L, rect->x);
             lua_pushnumber(L, rect->y);
             lua_pushnumber(L, rect->width);
             lua_pushnumber(L, rect->height);
-            luaH_pcall(L, 5, 0);
+            luaH_pcall(L, 4, 0);
         }
     }
     lua_settop(L, top);
@@ -185,6 +179,7 @@ gint main(gint argc, gchar **argv)
     gtk_widget_set_hexpand((GtkWidget*)scroll, TRUE);
     gtk_widget_set_vexpand((GtkWidget*)scroll, TRUE);
     gtk_scrolled_window_set_policy(scroll, GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_propagate_natural_width(scroll, TRUE);
 
     gtk_widget_set_name((GtkWidget*)scroll,    "content");
     gtk_widget_set_name((GtkWidget*)statusbox, "status");
@@ -227,7 +222,6 @@ gint main(gint argc, gchar **argv)
     g_signal_connect(window, "destroy",         G_CALLBACK(gtk_main_quit), (gpointer)L);
     g_signal_connect(window, "key-press-event", G_CALLBACK(cb_key),        (gpointer)L);
     g_signal_connect(window, "size-allocate",   G_CALLBACK(cb_size),       (gpointer)L);
-    g_signal_connect(scroll, "size-allocate",   G_CALLBACK(cb_size),       (gpointer)L);
 
     gtk_widget_show_all((GtkWidget*)window);
     gtk_main();

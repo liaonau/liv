@@ -40,9 +40,9 @@ static void luaH_frame_update(lua_State* L, frameL* f)
         }
         lua_pop(L, 1);
         gtk_image_set_from_pixbuf(f->image, pxb);
-        gtk_widget_show_all((GtkWidget*)f->frame);
         g_object_unref(pxb);
     }
+    gtk_widget_show_all((GtkWidget*)f->frame);
     /*gboolean show_deferred = lua_toboolean(L, 3);*/
     /*idle_load(L, f->image, i, show_deferred);*/
 }
@@ -97,27 +97,18 @@ static int label_set_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
     const gchar* text = lua_tostring(L, 2);
-    gtk_frame_set_label(f->frame, text);
-
-    GtkLabel* label = (GtkLabel*)gtk_frame_get_label_widget((GtkFrame*)f->frame);
-    gtk_label_set_ellipsize(label, PANGO_ELLIPSIZE_START);
-    gtk_label_set_line_wrap(label, FALSE);
-
-    gtk_widget_show_all((GtkWidget*)f->frame);
-    return 0;
-}
-static int shadow_get_frameL(lua_State* L)
-{
-    frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
-    GtkShadowType shadow = gtk_frame_get_shadow_type((GtkFrame*)f->frame);
-    lua_pushboolean(L, shadow != GTK_SHADOW_NONE);
-    return 1;
-}
-static int shadow_set_frameL(lua_State* L)
-{
-    frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
-    gboolean shadow = lua_toboolean(L, 2);
-    gtk_frame_set_shadow_type((GtkFrame*)f->frame, shadow ? GTK_SHADOW_ETCHED_OUT : GTK_SHADOW_NONE);
+    if (text)
+    {
+        gtk_frame_set_label(f->frame, "");
+        GtkLabel* label = (GtkLabel*)gtk_frame_get_label_widget(f->frame);
+        gtk_label_set_markup(label, text);
+        /*GtkWidgetPath* p = gtk_widget_get_path((GtkWidget*)label);*/
+        /*gchar* ps = gtk_widget_path_to_string(p);*/
+        /*info("%s", ps);*/
+        /*g_free(ps);*/
+    }
+    else
+        gtk_frame_set_label(f->frame, text);
     gtk_widget_show_all((GtkWidget*)f->frame);
     return 0;
 }
@@ -129,10 +120,12 @@ static int size_request_frameL(lua_State* L)
     gint h = luaL_checkint(L, 3);
     if (w < 1 || h < 1)
     {
-        w = 1;
-        h = 1;
+        w = -1;
+        h = -1;
     }
+    /*luaH_frame_update(L, f);*/
     gtk_widget_set_size_request((GtkWidget*)f->image, w, h);
+    gtk_widget_show_all((GtkWidget*)f->frame);
     return 0;
 }
 static int preferred_size_frameL(lua_State* L)
@@ -143,6 +136,22 @@ static int preferred_size_frameL(lua_State* L)
     lua_pushnumber(L, nat.width);
     lua_pushnumber(L, nat.height);
     return 2;
+}
+static int class_add_frameL(lua_State* L)
+{
+    frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
+    const gchar* class = luaL_checkstring(L, 2);
+    GtkStyleContext* context = gtk_widget_get_style_context((GtkWidget*)f->frame);
+    gtk_style_context_add_class(context, class);
+    return 0;
+}
+static int class_remove_frameL(lua_State* L)
+{
+    frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
+    const gchar* class = luaL_checkstring(L, 2);
+    GtkStyleContext* context = gtk_widget_get_style_context((GtkWidget*)f->frame);
+    gtk_style_context_remove_class(context, class);
+    return 0;
 }
 
 static int gc_frameL(lua_State *L)
@@ -167,10 +176,11 @@ static int index_frameL(lua_State *L)
 
     INDEX_FIELD(name,   frame);
     INDEX_FIELD(label,  frame);
-    INDEX_FIELD(shadow, frame);
 
     CASE_FUNC(size_request,   frame);
     CASE_FUNC(preferred_size, frame);
+    CASE_FUNC(class_add,      frame);
+    CASE_FUNC(class_remove,   frame);
 
     return 1;
 }
@@ -183,7 +193,6 @@ static int newindex_frameL(lua_State *L)
 
     NEWINDEX_FIELD(name,   frame);
     NEWINDEX_FIELD(label,  frame);
-    NEWINDEX_FIELD(shadow, frame);
 
     return 0;
 }
