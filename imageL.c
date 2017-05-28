@@ -89,12 +89,7 @@ GdkPixbuf* image_get_scaled_pixbuf(imageL* i, gint width, gint height)
             pxb = gdk_pixbuf_scale_simple(i->pxb, width, height, GDK_INTERP_BILINEAR);
     }
     else
-    {
-        if (unscaled)
-            pxb = gdk_pixbuf_new_from_file(i->path, NULL);
-        else
-            pxb = gdk_pixbuf_new_from_file_at_scale(i->path, width, height, FALSE, NULL);
-    }
+        pxb = gdk_pixbuf_new_from_file_at_scale(i->path, width, height, FALSE, NULL);
     return pxb;
 }
 GdkPixbuf* image_get_stated_pixbuf(imageL* i, GdkPixbuf* startpxb, guint8 state)
@@ -283,7 +278,9 @@ static int dump_imageL(lua_State* L)
     }
     const gchar* name = gdk_pixbuf_format_get_name(format);
 
-    task_dump_image(i, name, path);
+    lua_pushvalue(L, 1);
+    gint ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    task_dump_image(i, name, path, L, ref);
     return 0;
 }
 

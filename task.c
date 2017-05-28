@@ -190,6 +190,7 @@ static void task_dump_destroy_notify_task_data(gpointer task_data)
 {
     task_dump_t* td = (task_dump_t*)task_data;
     g_free(td->path);
+    luaL_unref(td->L, LUA_REGISTRYINDEX, td->ref);
     g_free(td);
 }
 
@@ -206,7 +207,7 @@ static void task_dump_func(GTask* task, gpointer source_object, gpointer task_da
         g_task_return_pointer(task, statedpxb, (GDestroyNotify)task_dump_pointer_free);
 }
 
-void task_dump_image(imageL* i, const gchar* name, const gchar* path)
+void task_dump_image(imageL* i, const gchar* name, const gchar* path, lua_State* L, gint ref)
 {
     task_dump_t* task_data = (task_dump_t*)g_new(task_dump_t, 1);
     task_data->i      = i;
@@ -215,6 +216,8 @@ void task_dump_image(imageL* i, const gchar* name, const gchar* path)
     task_data->width  = i->width;
     task_data->height = i->height;
     task_data->state  = i->state;
+    task_data->L      = L;
+    task_data->ref    = ref;
     GTask* task = g_task_new(NULL, NULL, (GAsyncReadyCallback)task_dump_cb, NULL);
     g_task_set_task_data(task, task_data, (GDestroyNotify)task_dump_destroy_notify_task_data);
     g_task_run_in_thread(task, task_dump_func);

@@ -51,10 +51,13 @@ typedef struct task_dump_t
     gint         width;
     gint         height;
     guint8       state;
+
+    lua_State*   L;
+    gint         ref;
 }
 task_dump_t;
 
 void task_frame_from_image_pixbuf(frameL*, imageL*, gulong, callback_t);
 void task_image_pixbuf_from_file(imageL*);
 void task_image_pixbuf_from_pixbuf(imageL*, GdkPixbuf*);
-void task_dump_image(imageL*, const gchar*, const gchar*);
+void task_dump_image(imageL*, const gchar*, const gchar*, lua_State*, gint);

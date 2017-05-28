@@ -426,11 +426,10 @@ create_thumb = function(pic)--{{{
     end
 
     pic.thumb.image = image.new(p, true, w, h)
-    thumbler.item_resize(pic, state.thumbsize)
-
     if (need_cache and not hit) then
-        pic.thumb.image:dump(cache_path)
+        image.new(pic.path, false, w, h):dump(cache_path)
     end
+    thumbler.item_resize(pic, state.thumbsize)
 end,
 --}}}
 item_size = function()--{{{
