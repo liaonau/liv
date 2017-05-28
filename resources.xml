@@ -3,5 +3,8 @@
     <gresource prefix="/resources">
         <file>broken.png</file>
         <file>deferred.gif</file>
+        <file>lua.ico</file>
+        <file>app.ico</file>
+        <file>loading.gif</file>
     </gresource>
 </gresources>

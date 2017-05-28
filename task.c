@@ -18,6 +18,7 @@
 
 #include "task.h"
 #include "util.h"
+#include "inlined.h"
 
 #define READ_FRAME_TIME_LOCKED(var, td)        \
 {                                              \
@@ -51,6 +52,7 @@ static void task_frame_cb(GObject* source_object, GAsyncResult* res, gpointer us
         {
             GdkPixbuf* pxb = (GdkPixbuf*)g_task_propagate_pointer(task, NULL);
             td->func(td->f, pxb);
+            gtk_window_set_icon(window, APPpxb);
         }
     }
 }

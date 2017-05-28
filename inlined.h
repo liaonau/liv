@@ -20,11 +20,17 @@
 
 #define BROKEN_NAME   "/resources/broken.png"
 #define DEFERRED_NAME "/resources/deferred.gif"
+#define LUA_NAME      "/resources/lua.ico"
+#define APP_NAME      "/resources/app.ico"
+#define LOADING_NAME  "/resources/loading.gif"
 
 #define PNG_FORMAT_NAME "png"
 
 GdkPixbuf*          BROKENpxb;
+GdkPixbuf*          LUApxb;
 GdkPixbufAnimation* DEFERREDpxb;
+GdkPixbuf*          APPpxb;
+GdkPixbuf*          LOADINGpxb;
 
 GdkPixbufFormat*    PNGformat;
 

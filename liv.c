@@ -252,6 +252,8 @@ gint main(gint argc, gchar **argv)
     if (!init_resources())
         fatal("can't init inlined resources");
 
+    gtk_window_set_icon(window, APPpxb);
+
     lua_State* L = init_lua_State();
     if (!L)
         fatal("can't init Lua");

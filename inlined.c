@@ -32,16 +32,32 @@ gboolean init_resources(void)
 {
     BROKENpxb   = NULL;
     DEFERREDpxb = NULL;
+    LUApxb      = NULL;
+    APPpxb      = NULL;
+    LOADINGpxb  = NULL;
+
     PNGformat   = NULL;
 
     GError* error = NULL;
-    BROKENpxb = gdk_pixbuf_new_from_resource(BROKEN_NAME, &error);
+    BROKENpxb   = gdk_pixbuf_new_from_resource(BROKEN_NAME, &error);
     FAIL_ON_ERROR(error);
     DEFERREDpxb = gdk_pixbuf_animation_new_from_resource(DEFERRED_NAME, &error);
+    FAIL_ON_ERROR(error);
+    LUApxb      = gdk_pixbuf_new_from_resource(LUA_NAME, &error);
+    FAIL_ON_ERROR(error);
+    APPpxb      = gdk_pixbuf_new_from_resource(APP_NAME, &error);
+    FAIL_ON_ERROR(error);
+    LOADINGpxb   = gdk_pixbuf_new_from_resource(LOADING_NAME, &error);
     FAIL_ON_ERROR(error);
     if (!GDK_IS_PIXBUF(BROKENpxb))
         return FALSE;
     if (!GDK_IS_PIXBUF_ANIMATION(DEFERREDpxb))
+        return FALSE;
+    if (!GDK_IS_PIXBUF(LUApxb))
+        return FALSE;
+    if (!GDK_IS_PIXBUF(APPpxb))
+        return FALSE;
+    if (!GDK_IS_PIXBUF(LOADINGpxb))
         return FALSE;
 
     GSList* formats = gdk_pixbuf_get_formats();
