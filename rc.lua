@@ -1,3 +1,17 @@
+--[[--{{{Copyright © 2017 Roman Leonov <rliaonau@gmail.com>
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+--]]--}}}
 --{{{G, opts     : глобальные переменные
 rex = require('rex_pcre')
 picture = frame.new()
@@ -67,8 +81,15 @@ setmetatable(
 
     thumbsize      = thumbs.size,
     picture_ixd    = 0,
+    picture_scroll = app.scroll,
     preview_scroll = app.scroll,
     delay_regrid   = false,
+
+    button =
+    {
+        x = 0,
+        y = 0,
+    },
 
     labels = thumbs.labels,
 },
@@ -138,94 +159,12 @@ css = string.gsub(css, '«([^«»]+)»',
         return tostring(css_replace[w])
     end)
 --}}}
---{{{thumbler    : вычисление параметров сетки
-thumbler =
-{
-item_size = function()--{{{
-    local psw, psh = 1, 1
-    for _, pic in ipairs(pics) do
-        local w, h = pic.thumb:preferred_size()
-        psw = math.max(psw, w)
-        psh = math.max(psh, h)
-    end
-    local spc = preview.spacing
-    return (psw + spc.row), (psh + spc.column)
-end,
---}}}
-resize = function(s)--{{{
-    s = math.min(thumbs.max_size, s)
-    s = math.max(thumbs.min_size, s)
-    state.thumbsize = s
-    for _, pic in ipairs(pics) do
-        local i = pic.thumb.image
-        pic.thumb.image = nil
-        if (not dims.native_fits(i, s, s)) then
-            i:scale(dims.inscribe(i, s, s))
-        else
-            i:scale(dims.native(i))
-        end
-        pic.thumb:size_request(s, s)
-        pic.thumb.image = i
-    end
-    thumbler.regrid()
-end,
---}}}
-regrid = function() --{{{
-    if (app.display ~= preview) then
-        state.delay_regrid = true
-        return
-    end
-    state.delay_regrid = false
-    local cw, ch = app:content_size()
-    local iw, ih = thumbler.item_size()
-    local square = math.ceil(math.sqrt(#pics))
-    local r = math.max(1, math.max(math.min( square, math.floor(cw / iw))))
-    local c = math.max(1, math.min(math.ceil(#pics / r), math.floor(ch / ih)))
-    state.rows     = r
-    state.cols_vis = c
-    state.cols     = math.ceil(#pics / r)
-    preview:clear()
-    for idx, pic in ipairs(pics) do
-        local l, t = thumbler.pos_by_idx(idx)
-        preview:attach(pic.thumb, l, t)
-    end
-    scroller.preview_adjust_to_current()
-end,
---}}}
-scale = function(step)--{{{
-    thumbler.resize(state.thumbsize + step)
-end,
---}}}
-adjust_size = function(max_w, max_h)--{{{
-    local max_thumb_size = math.max(max_w, max_h)
-    thumbs.min_size = math.min(thumbs.min_size, max_thumb_size)
-    thumbs.max_size = math.min(thumbs.max_size, max_thumb_size)
-    thumbs.size = math.min(thumbs.size, math.min(thumbs.max_size, math.max(thumbs.min_size, max_thumb_size)))
-end,
---}}}
-pos_by_idx = function(idx)--{{{
-    local r = state.rows
-    local l = (idx - 1) % r + 1
-    local t = (idx - l) / r + 1
-    return l, t
-end,
---}}}
-idx_by_pos = function(l, t)--{{{
-    return ((t - 1) * state.rows + l)
-end,
---}}}
-pos_exists = function(l, t)--{{{
-    local idx = thumbler.idx_by_pos(l, t)
-    return (l > 0 and t > 0 and l <= state.rows and t <= state.cols and idx > 0 and idx <= #pics)
-end,
---}}}
-}
---}}}
 --{{{ init        : начальный вызов
 init = function(...)
     app.title = app.name
     app.style(css)
     args = {...}
+
 --{{{ читаем файлы
     local max_w, max_h = 1, 1
     for n, path in ipairs(args) do
@@ -248,6 +187,7 @@ init = function(...)
         end
     end
 --}}}
+
     if (#pics == 0) then--{{{
         io.stderr:write('Nothing to display. Exiting.\n')
         os.exit(0)
@@ -260,18 +200,20 @@ init = function(...)
     thumbler.adjust_size(max_w, max_h)
     state.thumbsize = thumbs.size
     for idx, pic in ipairs(pics) do
-        local tmp = image.new(pic.path, false)
-        if (not dims.native_fits(tmp, thumbs.max_size, thumbs.max_size)) then
-            tmp:scale(dims.inscribe(tmp, thumbs.max_size, thumbs.max_size))
+        local i = pic.image
+        local w, h = dims.native(i)
+        if (not dims.native_fits(i, thumbs.max_size, thumbs.max_size)) then
+            w, h = dims.inscribe(i, thumbs.max_size, thumbs.max_size)
         end
         pic.thumb = frame.new()
-        pic.thumb.image = tmp:fork()
+        pic.thumb.image = image.new(pic.path, true, w, h)
         pic.thumb:class_add('thumb')
         marker.update(idx)
         pic.thumb.label = texter.label_index(idx)
     end
-    thumbler.resize(state.thumbsize)
+    thumbler.resize(state.thumbsize, true)
 --}}}
+
     if (#pics == 1) then--{{{
         viewer.show_picture()
     else
@@ -420,6 +362,116 @@ direction = function(l, t)--{{{
     end
 end,
 --}}}
+coords = function(x, y)--{{{
+    local left, top = thumbler.pos_by_coords(x, y)
+    if (thumbler.pos_exists(left, top)) then
+        viewer.set(thumbler.idx_by_pos(left, top))
+    end
+end,
+--}}}
+}
+--}}}
+--{{{thumbler    : вычисление параметров сетки
+thumbler =
+{
+item_size = function()--{{{
+    local psw, psh = 1, 1
+    for _, pic in ipairs(pics) do
+        local w, h = pic.thumb:preferred_size()
+        psw = math.max(psw, w)
+        psh = math.max(psh, h)
+    end
+    local spc = preview.spacing
+    return (psw + spc.row), (psh + spc.column)
+end,
+--}}}
+resize = function(s, force)--{{{
+    s = math.min(thumbs.max_size, s)
+    s = math.max(thumbs.min_size, s)
+    if (s == state.thumbsize and not force) then
+        return
+    end
+    state.thumbsize = s
+    for _, pic in ipairs(pics) do
+        local i = pic.thumb.image
+        local w, h = i.width, i.height
+        local W, H
+        if (not dims.native_fits(i, s, s)) then
+            W, H = dims.inscribe(i, s, s)
+        else
+            W, H = dims.native(i)
+        end
+        if (w ~= W or h ~= H) then
+            i:scale(W, H)
+        end
+        pic.thumb:size_request(s, s)
+    end
+    thumbler.regrid()
+end,
+--}}}
+regrid = function() --{{{
+    if (app.display ~= preview) then
+        state.delay_regrid = true
+        return
+    end
+    state.delay_regrid = false
+    local cw, ch = app:content_size()
+    local iw, ih = thumbler.item_size()
+    local square = math.ceil(math.sqrt(#pics))
+    local r = math.max(1, math.max(math.min( square, math.floor(cw / iw))))
+    local c = math.max(1, math.min(math.ceil(#pics / r), math.floor(ch / ih)))
+    state.rows     = r
+    state.cols_vis = c
+    state.cols     = math.ceil(#pics / r)
+    preview:clear()
+    for idx, pic in ipairs(pics) do
+        local l, t = thumbler.pos_by_idx(idx)
+        preview:attach(pic.thumb, l, t)
+    end
+    scroller.preview_adjust_to_current()
+end,
+--}}}
+scale = function(step)--{{{
+    thumbler.resize(state.thumbsize + step)
+end,
+--}}}
+adjust_size = function(max_w, max_h)--{{{
+    local max_thumb_size = math.max(max_w, max_h)
+    thumbs.min_size = math.min(thumbs.min_size, max_thumb_size)
+    thumbs.max_size = math.min(thumbs.max_size, max_thumb_size)
+    thumbs.size = math.min(thumbs.size, math.min(thumbs.max_size, math.max(thumbs.min_size, max_thumb_size)))
+end,
+--}}}
+pos_by_idx = function(idx)--{{{
+    local r = state.rows
+    local l = (idx - 1) % r + 1
+    local t = (idx - l) / r + 1
+    return l, t
+end,
+--}}}
+pos_by_coords = function(coords)--{{{
+    local x = coords.x
+    local y = coords.y
+    local cw, ch = app:content_size()
+    local iw, ih = thumbler.item_size()
+    local scr = app.scroll
+
+    local xs = (scr.h + x - (cw / 2)) / iw
+    local ys = (scr.v + y - (ch / 2)) / ih
+    local L = math.ceil(math.min((state.rows     / 2), (cw / (2 * iw))) + xs)
+    local T = math.ceil(math.min((state.cols_vis / 2), (ch / (2 * ih))) + ys)
+    return L, T
+end,
+--}}}
+idx_by_pos = function(l, t)--{{{
+    return ((t - 1) * state.rows + l)
+end,
+--}}}
+pos_exists = function(l, t)--{{{
+    local idx = thumbler.idx_by_pos(l, t)
+    return (l > 0 and t > 0 and l <= state.rows and t <= state.cols and idx > 0 and idx <= #pics)
+end,
+--}}}
 }
 --}}}
 --{{{viewer      : просмотр
@@ -429,6 +481,8 @@ update_picture = function()--{{{
     if (state.picture_ixd ~= IDX) then
         picture.image     = IMG
         state.picture_ixd = IDX
+    else
+        scroller.picture_restore()
     end
 end,
 --}}}
@@ -485,6 +539,7 @@ show_preview = function()--{{{
     local restore = (app.display == picture)
     app.display = preview
     if (restore) then
+        scroller.picture_store()
         scroller.preview_restore()
     end
     viewer.update_preview()
@@ -525,7 +580,6 @@ end,
 
 toggle_status = function()--{{{
     app.status = not app.status.visible
-    thumbler.regrid()
 end,
 --}}}
 }
@@ -548,6 +602,14 @@ toggle = function(idx)--{{{
     local pic = pics[idx]
     pic.mark = not pic.mark
     marker.update(idx)
+end,
+--}}}
+toggle_coords = function(x, y)--{{{
+    local l, t = thumbler.pos_by_coords(x, y)
+    if (thumbler.pos_exists(l, t)) then
+        local idx = thumbler.idx_by_pos(l, t)
+        marker.toggle(idx)
+    end
 end,
 --}}}
 set = function(idx)--{{{
@@ -667,16 +729,8 @@ end,
 }
 --}}}
 --{{{transformer : масштабирование и повороты изображения
-transformer =
+local transformer_mt =--{{{
 {
-perform = function(i, func, ...)--{{{
-    i[func](i, ...)
-    if (i == IMG and app.display == picture) then
-        picture.image = i
-    end
-end,
---}}}
-
 zoom_mul  = function(i, s) --{{{
     local min, max = dims.constrains(i)
     local w, h = i.width, i.height
@@ -690,7 +744,7 @@ zoom_mul  = function(i, s) --{{{
     elseif (w > max or h > max) then
         if (w >= h) then w, h = max, max / a else w, h = max * a, max end
     end
-    transformer.perform(i, 'scale', w, h)
+    i:scale(w, h)
 end,
 --}}}
 zoom_add  = function(i, step) --{{{
@@ -708,20 +762,38 @@ scale_add = function(i, step_w, step_h) --{{{
     w, h = w + step_w, h + step_h
     w = math.min(max, math.max(min, w))
     h = math.min(max, math.max(min, h))
-    transformer.perform(i, 'scale', w, h)
+    i:scale(w, h)
 end,
 --}}}
-scale_to_native_aspect    = function(i) transformer.perform(i, 'scale', dims.native_aspect(i))                end,
-scale_to_native           = function(i) transformer.perform(i, 'scale', dims.native(i))                       end,
-scale_to_window           = function(i) transformer.perform(i, 'scale', dims.content(i))                      end,
-scale_in_window           = function(i) transformer.perform(i, 'scale', dims.inscribe(i, dims.content(i)))    end,
+scale_to_native_aspect    = function(i) i:scale(dims.native_aspect(i))             end,
+scale_to_native           = function(i) i:scale(dims.native(i))                    end,
+scale_to_window           = function(i) i:scale(dims.content(i))                   end,
+scale_in_window           = function(i) i:scale(dims.inscribe(i, dims.content(i))) end,
 scale_to_window_if_larger = function(i) if (not dims.content_fits(i)) then transformer.scale_to_window(i) end end,
 scale_in_window_if_larger = function(i) if (not dims.content_fits(i)) then transformer.scale_in_window(i) end end,
 
-rotate = function(i, clockwise)  transformer.perform(i, 'rotate', clockwise) end,
-flip   = function(i, horizontal) transformer.perform(i, 'flip', horizontal)  end,
-reset  = function(i)             transformer.perform(i, 'reset')             end,
+rotate = function(i, clockwise)  i:rotate(clockwise) end,
+flip   = function(i, horizontal) i:flip(horizontal)  end,
+reset  = function(i)             i:reset()           end,
 }
+--}}}
+transformer = setmetatable(--{{{
+{},
+{
+    __index = function(t, k)
+        return function (...)
+            local args = {...}
+            if (args[1] == IMG) then
+                scroller.picture_store()
+            end
+            rawget(transformer_mt, k)(...)
+            if (args[1] == IMG) then
+                scroller.picture_restore()
+            end
+        end
+    end
+})
+--}}}
 --}}}
 --{{{scroller    : скроллинг
 scroller =
@@ -742,6 +814,23 @@ center = function()--{{{
     {
         h = 0.5 * (s.max_h - W - s.min_h),
         v = 0.5 * (s.max_v - H - s.min_v),
+    }
+end,
+--}}}
+
+picture_store = function()--{{{
+    state.picture_scroll = app.scroll
+end,
+--}}}
+picture_restore = function()--{{{
+    local w, h = app.content_size()
+    local oldscr = state.picture_scroll
+    local newscr = app.scroll
+    -- не работает корректно: oldscr == newscr, нужен колбек на scroll-changed
+    app.scroll =
+    {
+        h = oldscr.h * (newscr.max_h - w - newscr.min_h) / (oldscr.max_h - w - oldscr.min_h),
+        v = oldscr.v * (newscr.max_v - h - newscr.min_v) / (oldscr.max_v - h - oldscr.min_v),
     }
 end,
 --}}}
@@ -836,6 +925,13 @@ end,
 --}}}
 --{{{test        : тестовая функция
 test = function()
+    --for i = 1, 100 do
+        --navigator.next()
+        --navigator.prev()
+    --end
+    --for idx, p in ipairs(pics) do
+        --print(p.thumb.image.memorized)
+    --end
     collectgarbage()
 end
 --}}}
@@ -992,10 +1088,10 @@ hotkeys =
         {{"Shift"  }, "question", prefixed(function(n) transformer.scale_add(IMG,  0, -n) end, images.zoom_step)},
 
         {{         }, "bracketleft",  function() transformer.rotate(IMG, false) end},
-        {{         }, "bracketright", function() transformer.rotate(IMG, true)  end},
+        {{         }, "bracketright", function() transformer.rotate(IMG, true ) end},
         {{"Shift"  }, "bracketleft",  function() transformer.rotate(IMG, false); transformer.scale_in_window_if_larger(IMG) end},
-        {{"Shift"  }, "bracketright", function() transformer.rotate(IMG, true);  transformer.scale_in_window_if_larger(IMG) end},
-        {{         }, "f",            function() transformer.flip(IMG, true)    end},
+        {{"Shift"  }, "bracketright", function() transformer.rotate(IMG, true ); transformer.scale_in_window_if_larger(IMG) end},
+        {{         }, "f",            function() transformer.flip(IMG, true )   end},
         {{         }, "v",            function() transformer.flip(IMG, false)   end},
         {{         }, "r",            function() transformer.reset(IMG)         end},
 
@@ -1026,7 +1122,13 @@ hotkeys =
 
         {{         }, "minus", prefixed(function(n) thumbler.scale(-n) end, thumbs.step)},
         {{         }, "equal", prefixed(function(n) thumbler.scale( n) end, thumbs.step)},
-        {{         }, "r",     function() thumbler.resize(thumbs.size) end},
+        {{"Shift"  }, "minus", function() thumbler.resize(thumbs.min_size) end},
+        {{"Shift"  }, "equal", function() thumbler.resize(thumbs.max_size) end},
+        {{         }, "r",     function() thumbler.resize(thumbs.size)     end},
+
+        {{         }, "button1", function() navigator.coords(state.button)     end},
+        {{         }, "button3", function() marker.toggle_coords(state.button) end},
+
     },
     --}}}
 }
@@ -1047,6 +1149,14 @@ size = function(x, y, w, h)--{{{
 end,
 --}}}
 keypress = function(mods, name, value)--{{{
+    steward.call(mods, name, value)
+end,
+--}}}
+button = function(mods, button, x, y)--{{{
+    state.button = {x = x, y = y}
+    --print(button)
+    local name  = 'button'..button
+    local value = -1 * button
     steward.call(mods, name, value)
 end,
 --}}}

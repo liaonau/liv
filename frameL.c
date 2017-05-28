@@ -1,9 +1,27 @@
+/*
+ * Copyright © 2017 Roman Leonov <rliaonau@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "luaL.h"
 #include "frameL.h"
 #include "imageL.h"
 #include "util.h"
+#include "task.h"
 #include "inlined.h"
-/*#include "idle.h"*/
 
 static int new_frameL(lua_State *L)
 {
@@ -17,7 +35,9 @@ static int new_frameL(lua_State *L)
     f->image = (GtkImage*)gtk_image_new();
     gtk_container_add(GTK_CONTAINER(f->frame), (GtkWidget*)f->image);
 
-    f->ref = LUA_REFNIL;
+    g_rw_lock_init(&f->lock);
+    f->time = 0;
+    f->ref  = LUA_REFNIL;
 
     gtk_widget_show_all((GtkWidget*)f->frame);
 
@@ -26,25 +46,43 @@ static int new_frameL(lua_State *L)
     return 1;
 }
 
+static void frame_update_from_pixbuf(frameL* f, GdkPixbuf* pxb)
+{
+    if (!pxb)
+        gtk_image_set_from_pixbuf(f->image, BROKENpxb);
+    else
+    {
+        gtk_image_set_from_pixbuf(f->image, pxb);
+        g_object_unref(pxb);
+    }
+    gtk_widget_show_all((GtkWidget*)f->frame);
+}
 static void luaH_frame_update(lua_State* L, frameL* f)
 {
     lua_rawgeti(L, LUA_REGISTRYINDEX, f->ref);
     if (lua_isuserdata(L, -1))
     {
         imageL* i = (imageL*)luaL_checkudata(L, -1, IMAGE);
-        GdkPixbuf* pxb = image_get_pixbuf(i);
-        if (!GDK_IS_PIXBUF(pxb))
+        gulong time;
+        g_rw_lock_writer_lock(&f->lock);
         {
-            pxb = BROKENpxb;
-            g_object_ref(pxb);
+            f->time++;
+            time = f->time;
         }
-        lua_pop(L, 1);
-        gtk_image_set_from_pixbuf(f->image, pxb);
-        g_object_unref(pxb);
+        g_rw_lock_writer_unlock(&f->lock);
+        /*if (i->pxb)*/
+            /*gtk_image_clear(f->image);*/
+        /*else*/
+            /*gtk_image_set_from_animation(f->image, DEFERREDpxb);*/
+        task_frame_from_image_pixbuf(f, i, time, &frame_update_from_pixbuf);
     }
-    gtk_widget_show_all((GtkWidget*)f->frame);
-    /*gboolean show_deferred = lua_toboolean(L, 3);*/
-    /*idle_load(L, f->image, i, show_deferred);*/
+    lua_pop(L, 1);
+}
+static void frame_image_changed_cb(GObject* emitter, gpointer lua_state_data, gpointer self)
+{
+    lua_State* L = (lua_State*) lua_state_data;
+    frameL*    f = (frameL*)self;
+    luaH_frame_update(L, f);
 }
 
 static int image_get_frameL(lua_State* L)
@@ -56,15 +94,26 @@ static int image_get_frameL(lua_State* L)
 static int image_set_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, f->ref);
+    if (lua_isuserdata(L, -1))
+    {
+        imageL* i = (imageL*)luaL_checkudata(L, -1, IMAGE);
+        g_signal_handler_disconnect(i->emitter, f->handler);
+    }
+    lua_pop(L, 1);
+
     luaL_unref(L, LUA_REGISTRYINDEX, f->ref);
     if (lua_isuserdata(L, 2))
     {
-        luaL_checkudata(L, 2, IMAGE);
+        imageL* i = (imageL*)luaL_checkudata(L, 2, IMAGE);
         lua_pushvalue(L, 2);
-        f->ref = luaL_ref(L, LUA_REGISTRYINDEX);
+        f->ref     = luaL_ref(L, LUA_REGISTRYINDEX);
+        f->handler = g_signal_connect(i->emitter, IMAGE_CHANGED_SIGNAL, (GCallback)frame_image_changed_cb, (gpointer)f);
     }
     else
         f->ref = LUA_REFNIL;
+
     luaH_frame_update(L, f);
     return 0;
 }
@@ -102,10 +151,6 @@ static int label_set_frameL(lua_State* L)
         gtk_frame_set_label(f->frame, "");
         GtkLabel* label = (GtkLabel*)gtk_frame_get_label_widget(f->frame);
         gtk_label_set_markup(label, text);
-        /*GtkWidgetPath* p = gtk_widget_get_path((GtkWidget*)label);*/
-        /*gchar* ps = gtk_widget_path_to_string(p);*/
-        /*info("%s", ps);*/
-        /*g_free(ps);*/
     }
     else
         gtk_frame_set_label(f->frame, text);
@@ -123,7 +168,6 @@ static int size_request_frameL(lua_State* L)
         w = -1;
         h = -1;
     }
-    /*luaH_frame_update(L, f);*/
     gtk_widget_set_size_request((GtkWidget*)f->image, w, h);
     gtk_widget_show_all((GtkWidget*)f->frame);
     return 0;
@@ -159,6 +203,7 @@ static int gc_frameL(lua_State *L)
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
     luaL_unref(L, LUA_REGISTRYINDEX, f->ref);
     g_object_unref(f->frame);
+    g_rw_lock_clear(&f->lock);
     return 0;
 }
 static int tostring_frameL(lua_State *L)

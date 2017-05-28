@@ -1,8 +1,35 @@
+/*
+ * Copyright © 2017 Roman Leonov <rliaonau@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "luaL.h"
 #include "util.h"
 #include "imageL.h"
 #include "inlined.h"
-/*#include "idle.h"*/
+#include "task.h"
+
+#define WRITE_LOCK(i)                 \
+{                                     \
+   g_rw_lock_writer_lock(&i->lock);   \
+}
+#define WRITE_UNLOCK(i)               \
+{                                     \
+   g_rw_lock_writer_unlock(&i->lock); \
+}
 
 //таблица умножения группы четырех вращений и вертикального и горизонтального отражения
 //a0-a3 — вращения, a4,a6 — горизонтальные и вертикальные отражения
@@ -17,25 +44,6 @@ static const guint8 states[8][8] =
     {6, 7, 4, 5, 2, 3, 0, 1},
     {7, 4, 5, 3, 1, 2, 3, 1}
 };
-static inline void image_state_change(imageL* i, guint8 action)
-{
-    i->state = states[action][i->state];
-}
-static inline void image_scale_change(imageL* i, gint width, gint height)
-{
-    i->width  = MAX(1, width);
-    i->height = MAX(1, height);
-}
-static inline void image_to_native(imageL* i)
-{
-    i->state  = 0;
-    i->width  = i->native_width;
-    i->height = i->native_height;
-}
-static inline void image_reset(imageL* i)
-{
-    image_to_native(i);
-}
 
 static inline gboolean image_is_swapped(imageL* i)
 {
@@ -47,7 +55,7 @@ static inline gboolean image_is_broken(imageL* i)
 }
 static inline gboolean image_is_memorized(imageL* i)
 {
-    return (i->pxb && GDK_IS_PIXBUF(i->pxb));
+    return (GDK_IS_PIXBUF(i->pxb));
 }
 static inline gboolean image_is_writable(imageL* i)
 {
@@ -57,64 +65,54 @@ static inline const gchar* image_format_name(imageL* i)
 {
     return (image_is_broken(i) ? NULL : gdk_pixbuf_format_get_name(i->format));
 }
-static inline void image_pixbuf_unref(imageL* i)
+
+static void image_register_signal(void)
 {
-    if (i->pxb)
-        g_object_unref(i->pxb);
+    g_signal_new("image-changed",
+            G_TYPE_OBJECT,
+            G_SIGNAL_RUN_FIRST, 0, NULL, NULL,
+            g_cclosure_marshal_VOID__POINTER,
+            G_TYPE_NONE, 1, G_TYPE_POINTER);
+    /*info("signal created");*/
+}
+static void image_emit_signal(imageL* i, lua_State* L)
+{
+    /*info("%s emitting signal", i->path);*/
+    g_signal_emit_by_name(i->emitter, IMAGE_CHANGED_SIGNAL, (gpointer)L);
 }
 
-static void image_set_broken(imageL* i)
+GdkPixbuf* image_get_scaled_pixbuf(imageL* i, gint width, gint height)
 {
-    gboolean was_broken = image_is_broken(i);
-    image_pixbuf_unref(i);
-    i->pxb           = NULL;
-    i->native_width  = 1;
-    i->native_height = 1;
-    i->format        = NULL;
-    if (!was_broken)
-        image_to_native(i);
-}
-static void image_update_info(imageL* i)
-{
-    gboolean was_broken = image_is_broken(i);
-    i->format = gdk_pixbuf_get_file_info(i->path, &i->native_width, &i->native_height);
-    if (G_UNLIKELY(image_is_broken(i)))
-        image_set_broken(i);
-    else
-        if (was_broken)
-            image_to_native(i);
-}
-
-static GdkPixbuf* image_pixbuf_from_file(imageL* i)
-{
-    image_update_info(i);
     if (image_is_broken(i))
         return NULL;
-    GdkPixbuf* pxb = gdk_pixbuf_new_from_file(i->path, NULL);
-    if (!GDK_IS_PIXBUF(pxb))
-        return NULL;
-    return pxb;
-}
-static inline GdkPixbuf* image_get_scaled_pixbuf(imageL* i, GdkPixbuf* startpxb)
-{
     GdkPixbuf* pxb;
-    gint w = gdk_pixbuf_get_width(startpxb);
-    gint h = gdk_pixbuf_get_height(startpxb);
-    if (w == i->width && h == i->height)
+    gboolean unscaled = (width == i->native_width && height == i->native_height);
+    if (image_is_memorized(i))
     {
-        pxb = startpxb;
-        g_object_ref(pxb);
+        if (unscaled)
+        {
+            pxb = i->pxb;
+            g_object_ref(pxb);
+        }
+        else
+            pxb = gdk_pixbuf_scale_simple(i->pxb, width, height, GDK_INTERP_BILINEAR);
     }
     else
-        pxb = gdk_pixbuf_scale_simple(startpxb, i->width, i->height, GDK_INTERP_BILINEAR);
-    g_object_unref(startpxb);
+    {
+        if (unscaled)
+            pxb = gdk_pixbuf_new_from_file(i->path, NULL);
+        else
+            pxb = gdk_pixbuf_new_from_file_at_scale(i->path, width, height, FALSE, NULL);
+    }
     return pxb;
 }
-static inline GdkPixbuf* image_get_stated_pixbuf(imageL* i, GdkPixbuf* startpxb)
+GdkPixbuf* image_get_stated_pixbuf(imageL* i, GdkPixbuf* startpxb, guint8 state)
 {
+    if (!startpxb)
+        return NULL;
     GdkPixbuf* pxb;
     GdkPixbuf* tmppxb;
-    switch (i->state)
+    switch (state)
     {
     case 0:
         pxb = startpxb;
@@ -149,49 +147,17 @@ static inline GdkPixbuf* image_get_stated_pixbuf(imageL* i, GdkPixbuf* startpxb)
     g_object_unref(startpxb);
     return pxb;
 }
-
-GdkPixbuf* image_get_pixbuf(imageL* i)
+/*не потокобезопасно*/
+GdkPixbuf* image_get_current_pixbuf(imageL* i)
 {
-    GdkPixbuf* pxb;
-    GdkPixbuf* nativepxb;
-    GdkPixbuf* tmppxb;
+    GdkPixbuf* scaledpxb;
+    GdkPixbuf* statedpxb;
 
-    if (image_is_memorized(i))
-    {
-        nativepxb = i->pxb;
-        g_object_ref(nativepxb);
-    }
-    else
-    {
-        nativepxb = image_pixbuf_from_file(i);
-        if (!GDK_IS_PIXBUF(nativepxb))
-            return NULL;
-    }
-
-    tmppxb = image_get_scaled_pixbuf(i, nativepxb);
-    pxb    = image_get_stated_pixbuf(i, tmppxb);
-    return pxb;
+    scaledpxb = image_get_scaled_pixbuf(i, i->width, i->height);
+    statedpxb = image_get_stated_pixbuf(i, scaledpxb, i->state);
+    return statedpxb;
 }
 
-static int new_imageL(lua_State *L)
-{
-    imageL* i = (imageL*)lua_newuserdata(L, sizeof(imageL));
-    const gchar* path = luaL_checkstring(L, 1);
-    gboolean memorize = lua_toboolean(L, 2);
-    i->path  = g_strdup(path);
-    i->state = 0;
-    i->pxb   = NULL;
-    image_update_info(i);
-    if (!image_is_broken(i))
-        image_to_native(i);
-    /*if (memorize && !image_is_broken(i))*/
-        /*idle_pixbuf(i, &image_pixbuf_from_file);*/
-    if (memorize)
-        i->pxb = image_pixbuf_from_file(i);
-    luaL_getmetatable(L, IMAGE);
-    lua_setmetatable(L, -2);
-    return 1;
-}
 static int info_imageL(lua_State *L)
 {
     const gchar* path = luaL_checkstring(L, 1);
@@ -206,23 +172,79 @@ static int info_imageL(lua_State *L)
         lua_pushnil(L);
     return 4;
 }
+static int new_imageL(lua_State *L)
+{
+    imageL* i = (imageL*)lua_newuserdata(L, sizeof(imageL));
+    const gchar* path = luaL_checkstring(L, 1);
+    gboolean memorize = lua_toboolean(L, 2);
+    i->path    = g_strdup(path);
+    i->emitter = g_object_newv(G_TYPE_OBJECT, 0, NULL);
+    g_rw_lock_init(&i->lock);
+    i->pxb     = NULL;
+    i->state   = 0;
+    i->format  = gdk_pixbuf_get_file_info(i->path, &i->native_width, &i->native_height);
+    if (image_is_broken(i))
+    {
+        i->native_width  = 1;
+        i->native_height = 1;
+    }
+    else
+    {
+        if (lua_isnumber(L, 3))
+            i->native_width  = lua_tonumber(L, 3);
+        if (lua_isnumber(L, 4))
+            i->native_height = lua_tonumber(L, 4);
+    }
+    i->width  = i->native_width;
+    i->height = i->native_height;
+    if (memorize && !image_is_broken(i))
+        task_image_pixbuf_from_file(i);
+
+    luaL_getmetatable(L, IMAGE);
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+static inline void image_state_change(imageL* i, guint8 action)
+{
+    i->state = states[action][i->state];
+}
+static inline void image_scale_change(imageL* i, gint width, gint height)
+{
+    i->width  = MAX(1, width);
+    i->height = MAX(1, height);
+}
+static inline void image_reset(imageL* i)
+{
+    i->state  = 0;
+    i->width  = i->native_width;
+    i->height = i->native_height;
+}
 
 static int rotate_imageL(lua_State* L)
 {
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     gboolean clockwise = lua_toboolean(L, 2);
-
     guint8 action = (clockwise ? 1 : 3);
+
+    WRITE_LOCK(i);
     image_state_change(i, action);
+    image_emit_signal(i, L);
+    WRITE_UNLOCK(i);
+
     return 0;
 }
 static int flip_imageL(lua_State* L)
 {
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     gboolean horizontal = lua_toboolean(L, 2);
-
     guint action = (horizontal) ? 4 : 6;
+
+    WRITE_LOCK(i);
     image_state_change(i, action);
+    image_emit_signal(i, L);
+    WRITE_UNLOCK(i);
+
     return 0;
 }
 static int set_state_imageL(lua_State* L)
@@ -230,7 +252,11 @@ static int set_state_imageL(lua_State* L)
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     guint8 state = luaL_checkinteger(L, 2);
 
+    WRITE_LOCK(i);
     image_state_change(i, state);
+    image_emit_signal(i, L);
+    WRITE_UNLOCK(i);
+
     return 0;
 }
 static int scale_imageL(lua_State* L)
@@ -238,53 +264,32 @@ static int scale_imageL(lua_State* L)
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     gint width  = luaL_checkinteger(L, 2);
     gint height = luaL_checkinteger(L, 3);
+
+    WRITE_LOCK(i);
     image_scale_change(i, width, height);
+    image_emit_signal(i, L);
+    WRITE_UNLOCK(i);
+
     return 0;
 }
 static int reset_imageL(lua_State* L)
 {
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
+
+    WRITE_LOCK(i);
     image_reset(i);
+    image_emit_signal(i, L);
+    WRITE_UNLOCK(i);
+
     return 0;
 }
 
-static int in_memory_imageL(lua_State* L)
-{
-    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
-    i->pxb = image_pixbuf_from_file(i);
-    return 0;
-}
-static int out_memory_imageL(lua_State* L)
-{
-    imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
-    image_pixbuf_unref(i);
-    i->pxb = image_pixbuf_from_file(i);
-    return 0;
-}
-
-static int fork_imageL(lua_State *L)
-{
-    imageL* p = (imageL*)luaL_checkudata(L, 1, IMAGE);
-    imageL* i = (imageL*)lua_newuserdata(L, sizeof(imageL));
-    i->path          = g_strdup(p->path);
-    /*idle_pixbuf(i, &image_get_pixbuf, p, NULL);*/
-    i->pxb           = image_get_pixbuf(p);
-    i->format        = p->format;
-    i->native_width  = p->width;
-    i->native_height = p->height;
-    i->width         = p->width;
-    i->height        = p->height;
-    i->state         = 0;
-    luaL_getmetatable(L, IMAGE);
-    lua_setmetatable(L, -2);
-    return 1;
-}
 static int dump_imageL(lua_State* L)
 {
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     const gchar* path = luaL_checkstring(L, 2);
 
-    GdkPixbuf* pxb = image_get_pixbuf(i);
+    GdkPixbuf* pxb = image_get_current_pixbuf(i);
     if (image_is_broken(i))
     {
         warn("Won't write «%s». Image is broken.", path);
@@ -300,7 +305,7 @@ static int dump_imageL(lua_State* L)
         format = PNGformat;
     }
     const gchar* name = gdk_pixbuf_format_get_name(format);
-    /*GdkPixbuf* pxb = image_get_pixbuf(i);*/
+    /*GdkPixbuf* pxb = image_get_current_pixbuf(i);*/
     GError* error = NULL;
     gdk_pixbuf_save(pxb, path, name, &error, NULL);
     if (error != NULL)
@@ -322,7 +327,10 @@ static int gc_imageL(lua_State *L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     g_free(i->path);
-    image_pixbuf_unref(i);
+    g_object_unref(i->emitter);
+    g_rw_lock_clear(&i->lock);
+    if (i->pxb)
+        g_object_unref(i->pxb);
     return 0;
 }
 static int index_imageL(lua_State *L)
@@ -348,10 +356,6 @@ static int index_imageL(lua_State *L)
     CASE_FUNC( scale,      image);
     CASE_FUNC( reset,      image);
 
-    CASE_FUNC( in_memory,  image);
-    CASE_FUNC( out_memory, image);
-
-    CASE_FUNC( fork,       image);
     CASE_FUNC( dump,       image);
 
     return 1;
@@ -371,6 +375,7 @@ static const struct luaL_Reg imageLlib_m [] =
 };
 int luaopen_imageL(lua_State *L)
 {
+    image_register_signal();
     luaL_newmetatable(L, IMAGE);
     luaL_setfuncs(L, imageLlib_m, 0);
     luaL_newlib(L, imageLlib_f, IMAGE);

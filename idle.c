@@ -1,18 +1,28 @@
+/*
+ * Copyright © 2017 Roman Leonov <rliaonau@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "idle.h"
 #include "imageL.h"
-#include "resource.h"
+/*#include "resource.h"*/
 #include "util.h"
 
 static GdkPixbuf* DEFERREDpxb = NULL;
 
-static inline void idle_init_deferred_pxb(void)
-{
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#pragma GCC diagnostic push
-    if (!DEFERREDpxb)
-        DEFERREDpxb = gdk_pixbuf_new_from_inline(-1, inline_deferred, FALSE, NULL);
-#pragma GCC diagnostic pop
-}
 static inline void idle_load_set_assosiated_image(lua_State* L, GtkImage* image, gint* ref)
 {
     lua_pushlightuserdata(L, (void*)image);
@@ -32,7 +42,7 @@ static gboolean idle_load_gsource_func(gpointer data)
     {
         if (lua_tonumber(L, -1) == idle->ref) // или нет смысла загружать
         {
-            idle->pxb = image_get_pixbuf(idle->i);
+            idle->pxb = image_get_current_pixbuf(idle->i);
             idle_load_set_assosiated_image(L, idle->image, NULL);
         }
         /*else*/
@@ -66,7 +76,6 @@ void idle_load(lua_State* L, GtkImage* image, imageL* i, gboolean show_deferred)
     idle_load_set_assosiated_image(L, image, &idle->ref);
     if (show_deferred)
     {
-        idle_init_deferred_pxb();
         gtk_image_set_from_pixbuf(image, DEFERREDpxb);
     }
     g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, (GSourceFunc)&idle_load_gsource_func, (gpointer)idle, (GDestroyNotify)&idle_load_destroy_notify);

@@ -1,3 +1,21 @@
+/*
+ * Copyright © 2017 Roman Leonov <rliaonau@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #include <stdlib.h>
 
 #include "luaL.h"
@@ -5,8 +23,6 @@
 #include "appL.h"
 #include "gridL.h"
 #include "frameL.h"
-
-static int ref = LUA_REFNIL;
 
 static int quit_appL(lua_State *L)
 {
@@ -148,7 +164,7 @@ static int scroll_set_appL(lua_State *L)
 
 static int display_get_appL(lua_State *L)
 {
-    lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, displayref);
     return 1;
 }
 static int display_set_appL(lua_State *L)
@@ -157,7 +173,7 @@ static int display_set_appL(lua_State *L)
     if (child)
     {
         gtk_container_remove(GTK_CONTAINER(scroll), child);
-        luaL_unref(L, LUA_REGISTRYINDEX, ref);
+        luaL_unref(L, LUA_REGISTRYINDEX, displayref);
     }
 
     GtkWidget* to_display = NULL;
@@ -173,7 +189,7 @@ static int display_set_appL(lua_State *L)
     if (to_display)
     {
         lua_pushvalue(L, 2);
-        ref = luaL_ref(L, LUA_REGISTRYINDEX);
+        displayref = luaL_ref(L, LUA_REGISTRYINDEX);
         gtk_container_add(GTK_CONTAINER(scroll), to_display);
     }
     gtk_widget_show_all((GtkWidget*)scroll);
