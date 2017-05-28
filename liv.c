@@ -206,8 +206,14 @@ gint main(gint argc, gchar **argv)
     g_option_context_free(context);
 
     window = (GtkWindow*)gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
     gtk_window_set_title(GTK_WINDOW(window), APPNAME);
     gtk_widget_set_name((GtkWidget*)window, "window");
+    GdkDisplay* display = gdk_display_get_default();
+    GdkMonitor* monitor = gdk_display_get_monitor_at_point(display, 0, 0);
+    GdkRectangle geometry;
+    gdk_monitor_get_geometry(monitor, &geometry);
+    gtk_window_set_default_size(window, geometry.width, geometry.height);
 
     GtkBox* mainbox;
     mainbox   = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
@@ -253,18 +259,19 @@ gint main(gint argc, gchar **argv)
     if (!luaH_loadrc(L, rcfile))
         fatal("can't find valid config file anywhere");
 
-    lua_getglobal(L, "init");
-    lua_checkstack(L, argc);
-    for (gint i = 1; i < argc; i++)
-        lua_pushstring(L, argv[i]);
-    luaH_pcall(L, argc - 1, 0);
-
     g_signal_connect(window, "destroy",            G_CALLBACK(gtk_main_quit), (gpointer)L);
     g_signal_connect(window, "key-press-event",    G_CALLBACK(cb_key),        (gpointer)L);
     g_signal_connect(window, "size-allocate",      G_CALLBACK(cb_size),       (gpointer)L);
     g_signal_connect(window, "button-press-event", G_CALLBACK(cb_button),     (gpointer)L);
 
     gtk_widget_show_all((GtkWidget*)window);
+
+    lua_getglobal(L, "init");
+    lua_checkstack(L, argc);
+    for (gint i = 1; i < argc; i++)
+        lua_pushstring(L, argv[i]);
+    luaH_pcall(L, argc - 1, 0);
+
     gtk_main();
 
     return 0;

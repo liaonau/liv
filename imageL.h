@@ -37,7 +37,6 @@ typedef struct imageL
     gint             height;
 
     GObject*         emitter;
-    GRWLock          lock;
 }
 imageL;
 

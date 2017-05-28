@@ -6,7 +6,7 @@ GCR = /usr/bin/glib-compile-resources
 RES = resources.xml
 
 INCS    := $(shell pkg-config --cflags $(PKGS)) -I./
-CFLAGS  := -std=gnu11 -ggdb -W -Wall -Wextra -Wno-unused-parameter $(INCS) $(CFLAGS)
+CFLAGS  := -std=gnu11 -ggdb -W -Wall -Wextra -Wno-unused-parameter -O3 $(INCS) $(CFLAGS)
 LIBS    += $(shell pkg-config --libs $(PKGS))
 LDFLAGS := -Wl,--export-dynamic $(LIBS) $(LDFLAGS)
 

@@ -22,15 +22,6 @@
 #include "inlined.h"
 #include "task.h"
 
-#define WRITE_LOCK(i)                 \
-{                                     \
-   g_rw_lock_writer_lock(&i->lock);   \
-}
-#define WRITE_UNLOCK(i)               \
-{                                     \
-   g_rw_lock_writer_unlock(&i->lock); \
-}
-
 //таблица умножения группы четырех вращений и вертикального и горизонтального отражения
 //a0-a3 — вращения, a4,a6 — горизонтальные и вертикальные отражения
 static const guint8 states[8][8] =
@@ -108,9 +99,9 @@ GdkPixbuf* image_get_scaled_pixbuf(imageL* i, gint width, gint height)
 }
 GdkPixbuf* image_get_stated_pixbuf(imageL* i, GdkPixbuf* startpxb, guint8 state)
 {
-    if (!startpxb)
+    if (startpxb == NULL)
         return NULL;
-    GdkPixbuf* pxb;
+    GdkPixbuf* pxb = NULL;
     GdkPixbuf* tmppxb;
     switch (state)
     {
@@ -179,7 +170,6 @@ static int new_imageL(lua_State *L)
     gboolean memorize = lua_toboolean(L, 2);
     i->path    = g_strdup(path);
     i->emitter = g_object_newv(G_TYPE_OBJECT, 0, NULL);
-    g_rw_lock_init(&i->lock);
     i->pxb     = NULL;
     i->state   = 0;
     i->format  = gdk_pixbuf_get_file_info(i->path, &i->native_width, &i->native_height);
@@ -227,10 +217,8 @@ static int rotate_imageL(lua_State* L)
     gboolean clockwise = lua_toboolean(L, 2);
     guint8 action = (clockwise ? 1 : 3);
 
-    WRITE_LOCK(i);
     image_state_change(i, action);
     image_emit_signal(i, L);
-    WRITE_UNLOCK(i);
 
     return 0;
 }
@@ -240,10 +228,8 @@ static int flip_imageL(lua_State* L)
     gboolean horizontal = lua_toboolean(L, 2);
     guint action = (horizontal) ? 4 : 6;
 
-    WRITE_LOCK(i);
     image_state_change(i, action);
     image_emit_signal(i, L);
-    WRITE_UNLOCK(i);
 
     return 0;
 }
@@ -252,10 +238,8 @@ static int set_state_imageL(lua_State* L)
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     guint8 state = luaL_checkinteger(L, 2);
 
-    WRITE_LOCK(i);
     image_state_change(i, state);
     image_emit_signal(i, L);
-    WRITE_UNLOCK(i);
 
     return 0;
 }
@@ -265,10 +249,8 @@ static int scale_imageL(lua_State* L)
     gint width  = luaL_checkinteger(L, 2);
     gint height = luaL_checkinteger(L, 3);
 
-    WRITE_LOCK(i);
     image_scale_change(i, width, height);
     image_emit_signal(i, L);
-    WRITE_UNLOCK(i);
 
     return 0;
 }
@@ -276,10 +258,8 @@ static int reset_imageL(lua_State* L)
 {
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
 
-    WRITE_LOCK(i);
     image_reset(i);
     image_emit_signal(i, L);
-    WRITE_UNLOCK(i);
 
     return 0;
 }
@@ -289,38 +269,22 @@ static int dump_imageL(lua_State* L)
     imageL* i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     const gchar* path = luaL_checkstring(L, 2);
 
-    GdkPixbuf* pxb = image_get_current_pixbuf(i);
     if (image_is_broken(i))
     {
         warn("Won't write «%s». Image is broken.", path);
-        g_object_unref(pxb);
         return 0;
     }
 
-    gboolean success = FALSE;
-    GdkPixbufFormat* format = i->format;
+    GdkPixbufFormat* format  = i->format;
     if (!gdk_pixbuf_format_is_writable(format))
     {
         info("«%s» is not a writable format. Saving «%s» as «png»", gdk_pixbuf_format_get_name(format), path);
         format = PNGformat;
     }
     const gchar* name = gdk_pixbuf_format_get_name(format);
-    /*GdkPixbuf* pxb = image_get_current_pixbuf(i);*/
-    GError* error = NULL;
-    gdk_pixbuf_save(pxb, path, name, &error, NULL);
-    if (error != NULL)
-    {
-        warn("cannot save «%s». %s", path, error->message);
-        g_error_free(error);
-    }
-    else
-    {
-        info("saved «%s».", path);
-        success = TRUE;
-    }
-    g_object_unref(pxb);
-    lua_pushboolean(L, success);
-    return 1;
+
+    task_dump_image(i, name, path);
+    return 0;
 }
 
 static int gc_imageL(lua_State *L)
@@ -328,7 +292,6 @@ static int gc_imageL(lua_State *L)
     imageL *i = (imageL*)luaL_checkudata(L, 1, IMAGE);
     g_free(i->path);
     g_object_unref(i->emitter);
-    g_rw_lock_clear(&i->lock);
     if (i->pxb)
         g_object_unref(i->pxb);
     return 0;

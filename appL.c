@@ -202,6 +202,21 @@ static int is_file_appL(lua_State *L)
     lua_pushboolean(L, g_file_test(path, G_FILE_TEST_IS_REGULAR));
     return 1;
 }
+static int is_dir_appL(lua_State *L)
+{
+    const gchar* path = luaL_checkstring(L, 1);
+    lua_pushboolean(L, g_file_test(path, G_FILE_TEST_IS_DIR));
+    return 1;
+}
+static int mk_dir_appL(lua_State *L)
+{
+    const gchar* path = luaL_checkstring(L, 1);
+    gint         mode = luaL_checknumber(L, 2);
+
+    gint ret = g_mkdir_with_parents(path, mode);
+    lua_pushboolean(L, (ret == 0));
+    return 1;
+}
 static int xdg_appL(lua_State *L)
 {
     lua_newtable(L);
@@ -213,6 +228,34 @@ static int xdg_appL(lua_State *L)
     lua_setfield(L, -2, "cache");
     lua_pushstring(L, g_get_user_data_dir());
     lua_setfield(L, -2, "data");
+    return 1;
+}
+static int digest_appL(lua_State *L)
+{
+    const gchar* path = luaL_checkstring(L, 1);
+    gchar* contents = NULL;
+    gsize  length;
+    gboolean success = g_file_get_contents(path, &contents, &length, NULL);
+    if (success)
+    {
+        GChecksum* cs = g_checksum_new(G_CHECKSUM_MD5);
+        g_checksum_update(cs, (guchar*)contents, length);
+        const gchar* md5 = g_checksum_get_string(cs);
+        lua_pushstring(L, md5);
+        g_checksum_free(cs);
+    }
+    else
+        lua_pushnil(L);
+    g_free(contents);
+    return 1;
+}
+static int hash_appL(lua_State *L)
+{
+    const gchar* path = luaL_checkstring(L, 1);
+    GFile* file = g_file_new_for_path(path);
+    guint hash = g_file_hash(file);
+    lua_pushnumber(L, hash);
+    g_object_unref(file);
     return 1;
 }
 
@@ -230,7 +273,11 @@ static int index_appL(lua_State *L)
     CASE_FUNC( quit,    app );
     CASE_FUNC( style,   app );
     CASE_FUNC( is_file, app );
+    CASE_FUNC( is_dir,  app );
+    CASE_FUNC( mk_dir,  app );
     CASE_FUNC( xdg,     app );
+    CASE_FUNC( digest,  app );
+    CASE_FUNC( hash,    app );
 
     CASE_FUNC( resize,       app );
     CASE_FUNC( window_size,  app );

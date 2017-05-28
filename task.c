@@ -27,20 +27,9 @@
     }                                          \
     g_rw_lock_reader_unlock(&((td)->f->lock)); \
 }
-#define READ_IMAGE_VARS_LOCKED(w, h, s, td)    \
-{                                              \
-    g_rw_lock_reader_lock(&((td)->i->lock));   \
-    {                                          \
-        w = (td)->i->width;                    \
-        h = (td)->i->height;                   \
-        s = (td)->i->state;                    \
-    }                                          \
-    g_rw_lock_reader_unlock(&((td)->i->lock)); \
-}
 #define RETURN_ERROR_AND_CLEANUP(pxb, canc)    \
 {                                              \
     task_frame_pointer_free(pxb);              \
-    warn("on "#pxb);                           \
     g_cancellable_cancel(canc);                \
 }
 
@@ -79,14 +68,11 @@ static void task_frame_func(GTask* task, gpointer source_object, gpointer task_d
     READ_FRAME_TIME_LOCKED(time, td);
     if (time == td->time)
     {
-        gint width, height;
-        guint8 state;
-        READ_IMAGE_VARS_LOCKED(width, height, state, td);
-        GdkPixbuf* scaledpxb = image_get_scaled_pixbuf(td->i, width, height);
+        GdkPixbuf* scaledpxb = image_get_scaled_pixbuf(td->i, td->width, td->height);
         READ_FRAME_TIME_LOCKED(time, td);
         if (time == td->time)
         {
-            GdkPixbuf* statedpxb = image_get_stated_pixbuf(td->i, scaledpxb, state);
+            GdkPixbuf* statedpxb = image_get_stated_pixbuf(td->i, scaledpxb, td->state);
             READ_FRAME_TIME_LOCKED(time, td);
             if (time == td->time)
                 g_task_return_pointer(task, statedpxb, (GDestroyNotify)task_frame_pointer_free);
@@ -104,10 +90,13 @@ static void task_frame_func(GTask* task, gpointer source_object, gpointer task_d
 void task_frame_from_image_pixbuf(frameL* f, imageL* i, gulong time, callback_t func)
 {
     task_frame_t* task_data = (task_frame_t*)g_new(task_frame_t, 1);
-    task_data->f    = f;
-    task_data->i    = i;
-    task_data->time = time;
-    task_data->func = func;
+    task_data->f      = f;
+    task_data->i      = i;
+    task_data->time   = time;
+    task_data->func   = func;
+    task_data->width  = i->width;
+    task_data->height = i->height;
+    task_data->state  = i->state;
 
     GCancellable* cancellable = g_cancellable_new();
     GTask* task = g_task_new(NULL, cancellable, (GAsyncReadyCallback)task_frame_cb, NULL);
@@ -173,5 +162,61 @@ void task_image_pixbuf_from_pixbuf(imageL* i, GdkPixbuf* pxb)
     GTask* task = g_task_new(NULL, NULL, (GAsyncReadyCallback)task_pixbuf_cb, NULL);
     g_task_set_task_data(task, task_data, (GDestroyNotify)task_pixbuf_destroy_notify_task_data);
     g_task_run_in_thread(task, task_pixbuf_func);
+    g_object_unref(task);
+}
+
+
+static void task_dump_pointer_free(gpointer pointer)
+{
+    if (pointer)
+        g_object_unref(pointer);
+}
+
+static void task_dump_cb(GObject* source_object, GAsyncResult* res, gpointer user_data)
+{
+    GTask* task = G_TASK(res);
+    task_dump_t* td = (task_dump_t*)g_task_get_task_data(task);
+    if (g_task_had_error(task))
+    {
+        GError* error = (GError*)g_task_propagate_pointer(task, NULL);
+        warn("cannot save «%s». %s", td->path, error->message);
+        g_error_free(error);
+    }
+    else
+        info("saved «%s».", td->path);
+}
+
+static void task_dump_destroy_notify_task_data(gpointer task_data)
+{
+    task_dump_t* td = (task_dump_t*)task_data;
+    g_free(td->path);
+    g_free(td);
+}
+
+static void task_dump_func(GTask* task, gpointer source_object, gpointer task_data, GCancellable* cancellable)
+{
+    task_dump_t* td = (task_dump_t*)task_data;
+    GdkPixbuf* scaledpxb = image_get_scaled_pixbuf(td->i, td->width, td->height);
+    GdkPixbuf* statedpxb = image_get_stated_pixbuf(td->i, scaledpxb, td->state);
+    GError* error = NULL;
+    gdk_pixbuf_save(statedpxb, td->path, td->name, &error, NULL);
+    if (error != NULL)
+        g_task_return_error(task, error);
+    else
+        g_task_return_pointer(task, statedpxb, (GDestroyNotify)task_dump_pointer_free);
+}
+
+void task_dump_image(imageL* i, const gchar* name, const gchar* path)
+{
+    task_dump_t* task_data = (task_dump_t*)g_new(task_dump_t, 1);
+    task_data->i      = i;
+    task_data->name   = name;
+    task_data->path   = g_strdup(path);
+    task_data->width  = i->width;
+    task_data->height = i->height;
+    task_data->state  = i->state;
+    GTask* task = g_task_new(NULL, NULL, (GAsyncReadyCallback)task_dump_cb, NULL);
+    g_task_set_task_data(task, task_data, (GDestroyNotify)task_dump_destroy_notify_task_data);
+    g_task_run_in_thread(task, task_dump_func);
     g_object_unref(task);
 }

@@ -25,8 +25,13 @@ typedef void (*callback_t)(frameL*, GdkPixbuf*);
 typedef struct task_frame_t
 {
     frameL*    f;
-    imageL*    i;
     gulong     time;
+
+    imageL*    i;
+    gint       width;
+    gint       height;
+    guint8     state;
+
     callback_t func;
 }
 task_frame_t;
@@ -38,6 +43,18 @@ typedef struct task_pixbuf_t
 }
 task_pixbuf_t;
 
+typedef struct task_dump_t
+{
+    imageL*      i;
+    const gchar* name;
+    gchar*       path;
+    gint         width;
+    gint         height;
+    guint8       state;
+}
+task_dump_t;
+
 void task_frame_from_image_pixbuf(frameL*, imageL*, gulong, callback_t);
 void task_image_pixbuf_from_file(imageL*);
 void task_image_pixbuf_from_pixbuf(imageL*, GdkPixbuf*);
+void task_dump_image(imageL*, const gchar*, const gchar*);

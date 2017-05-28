@@ -70,10 +70,8 @@ static void luaH_frame_update(lua_State* L, frameL* f)
             time = f->time;
         }
         g_rw_lock_writer_unlock(&f->lock);
-        /*if (i->pxb)*/
-            /*gtk_image_clear(f->image);*/
-        /*else*/
-            /*gtk_image_set_from_animation(f->image, DEFERREDpxb);*/
+        if (!i->pxb)
+            gtk_image_set_from_animation(f->image, DEFERREDpxb);
         task_frame_from_image_pixbuf(f, i, time, &frame_update_from_pixbuf);
     }
     lua_pop(L, 1);

@@ -169,7 +169,7 @@ init = function(...)
     local max_w, max_h = 1, 1
     for n, path in ipairs(args) do
         if (not app.is_file(path)) then
-            io.stderr:write('warning: «'..path..'» is not a regular file\n')
+            texter.warn('«'..path..'» is not a regular file')
         else
             local memorize = true
             local ok, w, h, format = image.info(path)
@@ -180,38 +180,37 @@ init = function(...)
             local i = image.new(path, memorize)
             table.insert(pics,
             {
-                path  = path,
-                image = i,
-                mark  = false,
+                path   = path,
+                image  = i,
+                mark   = false,
+                digest = app.digest(path)
             })
         end
     end
 --}}}
 
     if (#pics == 0) then--{{{
-        io.stderr:write('Nothing to display. Exiting.\n')
+        texter.fatal('Nothing to display. Exiting.')
         os.exit(0)
     end
 --}}}
     navigator.index(IDX)
+    cacher.init()
 
 --{{{ создаем превью
     preview.spacing = thumbs.spacing
     thumbler.adjust_size(max_w, max_h)
     state.thumbsize = thumbs.size
     for idx, pic in ipairs(pics) do
-        local i = pic.image
-        local w, h = dims.native(i)
-        if (not dims.native_fits(i, thumbs.max_size, thumbs.max_size)) then
-            w, h = dims.inscribe(i, thumbs.max_size, thumbs.max_size)
-        end
         pic.thumb = frame.new()
-        pic.thumb.image = image.new(pic.path, true, w, h)
         pic.thumb:class_add('thumb')
         marker.update(idx)
         pic.thumb.label = texter.label_index(idx)
     end
-    thumbler.resize(state.thumbsize, true)
+    for idx, pic in ipairs(pics) do
+        thumbler.create_thumb(pic)
+    end
+    thumbler.regrid()
 --}}}
 
     if (#pics == 1) then--{{{
@@ -244,23 +243,58 @@ d = function(text) return '<span background="#000000">' .. tostring(text) .. '</
 w = function(text) return '<span background="#ffffff">' .. tostring(text) .. '</span>' end,
 }
 --}}}
+--{{{cacher      : кэширование изображений
+cacher =
+{
+access = true,
+dir    = nil,
+init = function()--{{{
+    local cd = app.xdg().cache
+    cacher.dir = (cd and cd..'/' or os.getenv('HOME')..'/.')..app.name..'/'
+    if (not app.is_dir(cacher.dir)) then
+        cacher.access = app.mk_dir(cacher.dir, 5570)
+    end
+end,
+--}}}
+calc = function(pic)--{{{
+    return app.hash(pic.path), app.digest(pic.path)
+end,--}}}
+check = function(pic, w, h)--{{{
+    if (not cacher.access) then
+        return pic.path, true
+    end
+    local i = pic.thumb.image
+    local d = pic.digest
+    local p = cacher.dir..d..'.'..w..'.'..h
+    local hit = app.is_file(p)
+    return p, hit
+end,
+--}}}
+}
+--}}}
 --{{{texter      : статусы
 texter =
 {
-success_state =--{{{
-{
-    val = false,
-    msg = '',
-    set = false,
-},
+--{{{ tty ANSI color escapes
+ANSI_COLOR_RESET     = string.char(27).."[0m",
+ANSI_COLOR_RED       = string.char(27).."[31m",
+ANSI_COLOR_GREEN     = string.char(27).."[32m",
+ANSI_COLOR_YELLOW    = string.char(27).."[33m",
+ANSI_COLOR_BLUE      = string.char(27).."[34m",
+ANSI_COLOR_MAGENTA   = string.char(27).."[35m",
+ANSI_COLOR_CYAN      = string.char(27).."[36m",
+ANSI_COLOR_BG_RED    = string.char(27).."[41m",
+ANSI_COLOR_BG_YELLOW = string.char(27).."[43m",
 --}}}
-success = function(val, msg)--{{{
-    texter.success_state.val = val
-    texter.success_state.msg = msg
-    texter.success_state.set = true
-end,
---}}}
-
+info = function(s)--{{{
+    io.stderr:write(texter.ANSI_COLOR_MAGENTA..'W: '..app.name..': '..s..texter.ANSI_COLOR_RESET..'\n')
+end,--}}}
+warn = function(s)--{{{
+    io.stderr:write(texter.ANSI_COLOR_BG_YELLOW..'W: '..app.name..': '..s..texter.ANSI_COLOR_RESET..'\n')
+end,--}}}
+fatal = function(s)--{{{
+    io.stderr:write(texter.ANSI_COLOR_BG_RED..'E: '..app.name..': '..s..texter.ANSI_COLOR_RESET..'\n')
+end,--}}}
 image_state_name = function(i)--{{{
     local state = i.state
     if     (state == 0) then return '0:   0°  '
@@ -319,9 +353,9 @@ set_status = function() --{{{
     local pos   = cond(is_preview, mkup.m('grid:')..'('..pl..','..pt..')')
     local imgst = cond((not is_preview), mkup.m('state:')..texter.image_state_name(IMG))
     local scale = cond(not is_preview, mkup.m('scale:')..'['..w..'x'..h..']px('..math.round(zw)..'x'..math.round(zh)..')%')
-    local scs   = cond(texter.success_state.set, (texter.success_state.val and mkup.g or mkup.r)(texter.success_state.msg))
+    local fmt   = mkup.m('fmt:')..(IMG.writeable and mkup.g or mkup.r)(IMG.format)
     local mem   = mkup.b(mkup.monospace(IMG.memorized and 'm' or 'd'))
-    local left  = mode..spc ..idx..spc ..mkd..spc ..mem..spc ..size..spc ..scs
+    local left  = mode..spc ..idx..spc ..fmt..spc ..mkd..spc ..mem..spc ..size
     local right = pos..spc ..imgst..spc ..scale ..pfx
     app.status  =
     {
@@ -334,9 +368,6 @@ end,
 update = function()--{{{
     texter.set_title()
     texter.set_status()
-    texter.success_state.set = false
-    texter.success_state.val = false
-    texter.success_state.msg = ''
 end,
 --}}}
 }
@@ -374,6 +405,34 @@ end,
 --{{{thumbler    : вычисление параметров сетки
 thumbler =
 {
+create_thumb = function(pic)--{{{
+    local ms = thumbs.max_size
+    local i  = pic.image
+    local w, h = dims.native(i)
+    local need_cache = false
+    if (not dims.native_fits(i, ms, ms)) then
+        w, h = dims.inscribe(i, ms, ms)
+        need_cache = true
+    end
+
+    local cache_path, hit = nil, true
+    local p = pic.path
+
+    if (need_cache) then
+        cache_path, hit = cacher.check(pic, ms, ms)
+        if (hit) then
+            p = cache_path
+        end
+    end
+
+    pic.thumb.image = image.new(p, true, w, h)
+    thumbler.item_resize(pic, state.thumbsize)
+
+    if (need_cache and not hit) then
+        pic.thumb.image:dump(cache_path)
+    end
+end,
+--}}}
 item_size = function()--{{{
     local psw, psh = 1, 1
     for _, pic in ipairs(pics) do
@@ -385,28 +444,36 @@ item_size = function()--{{{
     return (psw + spc.row), (psh + spc.column)
 end,
 --}}}
-resize = function(s, force)--{{{
+item_resize = function(pic, s)--{{{
+    local i = pic.thumb.image
+    local w, h = i.width, i.height
+    local W, H
+    if (not dims.native_fits(i, s, s)) then
+        W, H = dims.inscribe(i, s, s)
+    else
+        W, H = dims.native(i)
+    end
+    if (w ~= W or h ~= H) then
+        i:scale(W, H)
+    end
+    pic.thumb:size_request(s, s)
+end,
+--}}}
+resize = function(s)--{{{
     s = math.min(thumbs.max_size, s)
     s = math.max(thumbs.min_size, s)
-    if (s == state.thumbsize and not force) then
+    if (s == state.thumbsize) then
         return
     end
     state.thumbsize = s
     for _, pic in ipairs(pics) do
-        local i = pic.thumb.image
-        local w, h = i.width, i.height
-        local W, H
-        if (not dims.native_fits(i, s, s)) then
-            W, H = dims.inscribe(i, s, s)
-        else
-            W, H = dims.native(i)
-        end
-        if (w ~= W or h ~= H) then
-            i:scale(W, H)
-        end
-        pic.thumb:size_request(s, s)
+        thumbler.item_resize(pic, s)
     end
     thumbler.regrid()
+end,
+--}}}
+scale = function(step)--{{{
+    thumbler.resize(state.thumbsize + step)
 end,
 --}}}
 regrid = function() --{{{
@@ -429,10 +496,6 @@ regrid = function() --{{{
         preview:attach(pic.thumb, l, t)
     end
     scroller.preview_adjust_to_current()
-end,
---}}}
-scale = function(step)--{{{
-    thumbler.resize(state.thumbsize + step)
 end,
 --}}}
 adjust_size = function(max_w, max_h)--{{{
@@ -897,6 +960,9 @@ dump = function(idx, infix)--{{{
     local i    = pics[idx].image
     local path = pics[idx].path
     local d, n, e = texter.split_path(path)
+    if (infix == '') then
+        infix = '.copy.'
+    end
     if (not i.writeable) then
         e = 'png'
     end
@@ -904,34 +970,46 @@ dump = function(idx, infix)--{{{
         e = '.'..e
     end
     local newpath = d..n..infix..e
-    local success = i:dump(newpath)
-    texter.success(success, 'dump image to «'..newpath..'»')
-    return success, newpath
+    i:dump(newpath)
 end,
 --}}}
+timestamp = function(idx)--{{{
+    dumper.dump(idx, os.date('.%Y.%m.%d-%H.%M.%S'))
+end,
+--}}}
+copy_count = {},
 copy = function(idx)--{{{
-    dumper.dump(idx, os.date('-%Y.%m.%d-%H.%M.%S'))
-end,
---}}}
-save = function(idx)--{{{
-    local success, newpath = dumper.dump(idx, '')
-    if (success) then
-        pics[idx].image:fix()
-        pics[idx].path = newpath
+    local dsc = dumper.copy_count
+    if (not dsc[idx]) then
+        dsc[idx] = 0
     end
+    dsc[idx] = dsc[idx] + 1
+    dumper.dump(idx, os.date('.'..dsc[idx]))
 end,
 --}}}
 }
 --}}}
 --{{{test        : тестовая функция
 test = function()
-    --for i = 1, 100 do
-        --navigator.next()
-        --navigator.prev()
-    --end
-    --for idx, p in ipairs(pics) do
-        --print(p.thumb.image.memorized)
-    --end
+    for i = 1, 103 do
+        navigator.next()
+        if (i % 10 == 0) then
+            IMG:rotate()
+        end
+        if (i % 7 == 0) then
+            transformer.zoom_add(IMG, -images.zoom_step)
+        end
+        if (i % 8 == 0) then
+            transformer.zoom_add(IMG,  images.zoom_step)
+        end
+        if (i % 24 == 0) then
+            IMG:flip(true)
+        end
+        if (i % 9 == 0) then
+            IMG:reset()
+        end
+        navigator.prev()
+    end
     collectgarbage()
 end
 --}}}
@@ -1095,9 +1173,8 @@ hotkeys =
         {{         }, "v",            function() transformer.flip(IMG, false)   end},
         {{         }, "r",            function() transformer.reset(IMG)         end},
 
-        --{{"Control"}, "l",            function() transformer.reload(IMG)        end},
-        --{{         "Control"}, "s", function() dumper.copy(IDX) end},
-        --{{"Shift", "Control"}, "s", function() dumper.save(IDX) end},
+        {{"Control"}, "d", function() dumper.copy(IDX)      end},
+        {{"Control"}, "s", function() dumper.timestamp(IDX) end},
     },
     --}}}
     [preview] = --{{{
@@ -1144,6 +1221,10 @@ callbacks =
 size = function(x, y, w, h)--{{{
     if (state.size.w ~= w or state.size.h ~= h) then
         thumbler.regrid()
+
+        for idx, pic in ipairs(pics) do
+            transformer.scale_in_window_if_larger(pic.image)
+        end
     end
     state.size = {w = w, h = h}
 end,
