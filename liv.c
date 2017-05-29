@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <locale.h>
+#include <string.h>
 
 static lua_State* init_lua_State(void)
 {
@@ -188,91 +189,121 @@ static void cb_button(GtkWidget* widget, GdkEventButton* ev, gpointer data)
 gint main(gint argc, gchar **argv)
 {
     setlocale(LC_ALL, "");
-
     gtk_init(&argc, &argv);
 
     gchar* rcfile = NULL;
-    GOptionContext      *context;
-    const GOptionEntry  entries[] =
+    { /* options */
+        GOptionContext      *context;
+        const GOptionEntry  entries[] =
+        {
+            { "rc", 'c', 0, G_OPTION_ARG_STRING, &rcfile,  "rc.lua config file to use", NULL },
+            { NULL,  0,  0, 0,                   NULL,     NULL,                        NULL },
+        };
+        context = g_option_context_new("[FILES]");
+        g_option_context_add_main_entries(context, entries, NULL);
+        GError* err = NULL;
+        if (!g_option_context_parse(context, &argc, &argv, &err))
+            fatal("%s\n", err->message);
+        g_option_context_free(context);
+    }
+    GPtrArray* infiles = NULL;
+    if (!isatty(STDIN_FILENO))
     {
-        { "rc", 'c', 0, G_OPTION_ARG_STRING, &rcfile, "rc.lua config file to use", NULL },
-        { NULL,  0,  0, 0,                   NULL,     NULL,                       NULL },
-    };
-    context = g_option_context_new("[FILES]");
-    g_option_context_add_main_entries(context, entries, NULL);
-    GError* err = NULL;
-    if (!g_option_context_parse(context, &argc, &argv, &err))
-        fatal("%s\n", err->message);
-    g_option_context_free(context);
+        infiles = g_ptr_array_new_with_free_func(&g_free);
+        GIOChannel* reader = g_io_channel_unix_new(STDIN_FILENO);
+        GIOStatus   status;
+        g_io_channel_set_line_term(reader, NULL, -1);
+        GString* gstr = g_string_new(NULL);
+        while ((status = g_io_channel_read_line_string(reader, gstr, NULL, NULL)) != G_IO_STATUS_EOF )
+        {
+            if (status == G_IO_STATUS_ERROR)
+                fatal("%s", "error while reading «stdin» occured");
+            gchar* s = g_strstrip(g_strdup(gstr->str));
+            if (strlen(s) != 0)
+                g_ptr_array_add(infiles, s);
+            else
+                g_free(s);
+        }
+        g_string_free(gstr, TRUE);
+        g_io_channel_shutdown(reader, FALSE, NULL);
+        g_io_channel_unref(reader);
+    }
 
     window = (GtkWindow*)gtk_window_new(GTK_WINDOW_TOPLEVEL);
-
-    gtk_window_set_title(GTK_WINDOW(window), APPNAME);
-    gtk_widget_set_name((GtkWidget*)window, "window");
-    GdkDisplay* display = gdk_display_get_default();
-    GdkMonitor* monitor = gdk_display_get_monitor_at_point(display, 0, 0);
-    GdkRectangle geometry;
-    gdk_monitor_get_geometry(monitor, &geometry);
-    gtk_window_set_default_size(window, geometry.width, geometry.height);
-
-    GtkBox* mainbox;
-    mainbox   = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
-    statusbox = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    scroll    = (GtkScrolledWindow*)gtk_scrolled_window_new(NULL, NULL);
-
-    displayref = LUA_REFNIL;
-
-    gtk_widget_set_hexpand((GtkWidget*)scroll, TRUE);
-    gtk_widget_set_vexpand((GtkWidget*)scroll, TRUE);
-    gtk_scrolled_window_set_policy(scroll, GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-    gtk_scrolled_window_set_propagate_natural_width(scroll, TRUE);
-
-    gtk_widget_set_name((GtkWidget*)scroll,    "content");
-    gtk_widget_set_name((GtkWidget*)statusbox, "status");
-
-    gtk_box_pack_start(mainbox, (GtkWidget*)scroll,    TRUE,  TRUE,  0);
-    gtk_box_pack_end(  mainbox, (GtkWidget*)statusbox, FALSE, FALSE, 0);
-
-#define NEW_LABEL(label, align)                                  \
-    {                                                            \
-        label = (GtkLabel*)gtk_label_new("");                    \
-        gtk_label_set_xalign((label), (align));                  \
-        gtk_label_set_ellipsize((label), PANGO_ELLIPSIZE_START); \
-        gtk_label_set_line_wrap((label), FALSE);                 \
-        gtk_widget_set_name((GtkWidget*)(label), #label);        \
+    { /* window */
+        gtk_window_set_title(GTK_WINDOW(window), APPNAME);
+        gtk_widget_set_name((GtkWidget*)window, "window");
+        GdkDisplay* display = gdk_display_get_default();
+        GdkMonitor* monitor = gdk_display_get_monitor_at_point(display, 0, 0);
+        GdkRectangle geometry;
+        gdk_monitor_get_geometry(monitor, &geometry);
+        gtk_window_set_default_size(window, geometry.width, geometry.height);
     }
-    NEW_LABEL(status_left,  0);
-    NEW_LABEL(status_right, 1);
+    GtkBox* mainbox;
+    mainbox    = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
+    statusbox  = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    scroll     = (GtkScrolledWindow*)gtk_scrolled_window_new(NULL, NULL);
+    displayref = LUA_REFNIL;
+    { /* scroll */
+        gtk_widget_set_hexpand((GtkWidget*)scroll, TRUE);
+        gtk_widget_set_vexpand((GtkWidget*)scroll, TRUE);
+        gtk_scrolled_window_set_policy(scroll, GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+        gtk_scrolled_window_set_propagate_natural_width(scroll, TRUE);
 
-    gtk_box_pack_start(statusbox, (GtkWidget*)status_left,  TRUE,  TRUE,  0);
-    gtk_box_pack_end(  statusbox, (GtkWidget*)status_right, FALSE, FALSE, 0);
+        gtk_widget_set_name((GtkWidget*)scroll,    "content");
+        gtk_widget_set_name((GtkWidget*)statusbox, "status");
 
+        gtk_box_pack_start(mainbox, (GtkWidget*)scroll,    TRUE,  TRUE,  0);
+        gtk_box_pack_end(  mainbox, (GtkWidget*)statusbox, FALSE, FALSE, 0);
+    }
+    { /*status line*/
+#define NEW_LABEL(label, align)                                  \
+        {                                                            \
+            label = (GtkLabel*)gtk_label_new("");                    \
+            gtk_label_set_xalign((label), (align));                  \
+            gtk_label_set_ellipsize((label), PANGO_ELLIPSIZE_START); \
+            gtk_label_set_line_wrap((label), FALSE);                 \
+            gtk_widget_set_name((GtkWidget*)(label), #label);        \
+        }
+        NEW_LABEL(status_left,  0);
+        NEW_LABEL(status_right, 1);
+
+        gtk_box_pack_start(statusbox, (GtkWidget*)status_left,  TRUE,  TRUE,  0);
+        gtk_box_pack_end(  statusbox, (GtkWidget*)status_right, FALSE, FALSE, 0);
+    }
     gtk_container_add(GTK_CONTAINER(window), (GtkWidget*)mainbox);
 
     if (!init_resources())
         fatal("can't init inlined resources");
-
     gtk_window_set_icon(window, APPpxb);
 
     lua_State* L = init_lua_State();
     if (!L)
         fatal("can't init Lua");
-
     if (!luaH_loadrc(L, rcfile))
         fatal("can't find valid config file anywhere");
 
-    g_signal_connect(window, "destroy",            G_CALLBACK(gtk_main_quit), (gpointer)L);
-    g_signal_connect(window, "key-press-event",    G_CALLBACK(cb_key),        (gpointer)L);
-    g_signal_connect(window, "size-allocate",      G_CALLBACK(cb_size),       (gpointer)L);
-    g_signal_connect(window, "button-press-event", G_CALLBACK(cb_button),     (gpointer)L);
+    { /* signals */
+        g_signal_connect(window, "destroy",            G_CALLBACK(gtk_main_quit), (gpointer)L);
+        g_signal_connect(window, "key-press-event",    G_CALLBACK(cb_key),        (gpointer)L);
+        g_signal_connect(window, "size-allocate",      G_CALLBACK(cb_size),       (gpointer)L);
+        g_signal_connect(window, "button-press-event", G_CALLBACK(cb_button),     (gpointer)L);
+    }
 
     gtk_widget_show_all((GtkWidget*)window);
 
     lua_getglobal(L, "init");
-    lua_checkstack(L, argc);
+    guint len = (infiles) ? infiles->len : 0;
+    lua_checkstack(L, argc + len);
     for (gint i = 1; i < argc; i++)
         lua_pushstring(L, argv[i]);
-    luaH_pcall(L, argc - 1, 0);
+    if (infiles)
+    {
+        for (guint i = 0; i < len; i++)
+            lua_pushstring(L, g_ptr_array_index(infiles, i));
+        g_ptr_array_free(infiles, TRUE);
+    }
+    luaH_pcall(L, argc + len - 1, 0);
 
     gtk_main();
 

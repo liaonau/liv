@@ -191,7 +191,7 @@ init = function(...)
 
     if (#pics == 0) then--{{{
         texter.fatal('Nothing to display. Exiting.')
-        os.exit(0)
+        app.quit();
     end
 --}}}
     navigator.index(IDX)
@@ -287,13 +287,13 @@ ANSI_COLOR_BG_RED    = string.char(27).."[41m",
 ANSI_COLOR_BG_YELLOW = string.char(27).."[43m",
 --}}}
 info = function(s)--{{{
-    io.stderr:write(texter.ANSI_COLOR_MAGENTA..'W: '..app.name..': '..s..texter.ANSI_COLOR_RESET..'\n')
+    io.stderr:write(texter.ANSI_COLOR_MAGENTA..'Lua I: '..app.name..': '..s..texter.ANSI_COLOR_RESET..'\n')
 end,--}}}
 warn = function(s)--{{{
-    io.stderr:write(texter.ANSI_COLOR_BG_YELLOW..'W: '..app.name..': '..s..texter.ANSI_COLOR_RESET..'\n')
+    io.stderr:write(texter.ANSI_COLOR_BG_YELLOW..'Lua W: '..app.name..': '..s..texter.ANSI_COLOR_RESET..'\n')
 end,--}}}
 fatal = function(s)--{{{
-    io.stderr:write(texter.ANSI_COLOR_BG_RED..'E: '..app.name..': '..s..texter.ANSI_COLOR_RESET..'\n')
+    io.stderr:write(texter.ANSI_COLOR_BG_RED..'Lua E: '..app.name..': '..s..texter.ANSI_COLOR_RESET..'\n')
 end,--}}}
 image_state_name = function(i)--{{{
     local state = i.state
@@ -541,6 +541,7 @@ viewer =
 {
 update_picture = function()--{{{
     if (state.picture_ixd ~= IDX) then
+        picture:clear()
         picture.image     = IMG
         state.picture_ixd = IDX
     else

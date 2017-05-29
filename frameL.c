@@ -157,6 +157,13 @@ static int label_set_frameL(lua_State* L)
     return 0;
 }
 
+static int clear_frameL(lua_State* L)
+{
+    frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
+    gtk_image_clear(f->image);
+    gtk_widget_show_all((GtkWidget*)f->frame);
+    return 0;
+}
 static int size_request_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
@@ -221,6 +228,7 @@ static int index_frameL(lua_State *L)
     INDEX_FIELD(name,   frame);
     INDEX_FIELD(label,  frame);
 
+    CASE_FUNC(clear,          frame);
     CASE_FUNC(size_request,   frame);
     CASE_FUNC(preferred_size, frame);
     CASE_FUNC(class_add,      frame);
