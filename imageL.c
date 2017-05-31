@@ -270,7 +270,7 @@ static int dump_imageL(lua_State* L)
         return 0;
     }
 
-    GdkPixbufFormat* format  = i->format;
+    GdkPixbufFormat* format = i->format;
     if (!gdk_pixbuf_format_is_writable(format))
     {
         info("«%s» is not a writable format. Saving «%s» as «png»", gdk_pixbuf_format_get_name(format), path);
