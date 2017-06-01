@@ -59,10 +59,8 @@ static gboolean luaH_loadrc(lua_State* L, gchar* confpath)
     gchar** p = paths;
     for (gint i = 0; p[i] && p ; i++)
     {
-        /*info("loadind «%s»", p[i]);*/
-        if (!g_file_test(p[i], G_FILE_TEST_EXISTS))
-            warn("«%s» doesn't exist", p[i]);
-        else
+        if (g_file_test(p[i], G_FILE_TEST_EXISTS))
+        {
             if (luaL_loadfile(L, p[i]) || lua_pcall(L, 0, 0, 0))
             {
                 const char* msg = lua_tostring(L, -1);
@@ -73,6 +71,7 @@ static gboolean luaH_loadrc(lua_State* L, gchar* confpath)
             }
             else
                 return TRUE;
+        }
     }
     return FALSE;
 }
