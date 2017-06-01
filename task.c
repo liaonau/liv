@@ -133,41 +133,6 @@ void task_image_pixbuf_from_file(imageL* i)
 }
 
 
-static void task_pixbuf_cb(GObject* source_object, GAsyncResult* res, gpointer user_data)
-{
-    GTask* task = G_TASK(res);
-    task_pixbuf_t* td = (task_pixbuf_t*)g_task_get_task_data(task);
-    GdkPixbuf* pxb = (GdkPixbuf*)g_task_propagate_pointer(task, NULL);
-    td->i->pxb = pxb;
-}
-
-static void task_pixbuf_destroy_notify_task_data(gpointer task_data)
-{
-    task_pixbuf_t* td = (task_pixbuf_t*)task_data;
-    g_object_unref(td->pxb);
-    g_free(td);
-}
-
-static void task_pixbuf_func(GTask* task, gpointer source_object, gpointer task_data, GCancellable* cancellable)
-{
-    task_pixbuf_t* td = (task_pixbuf_t*)task_data;
-    GdkPixbuf* pxb = gdk_pixbuf_scale_simple(td->pxb, td->i->native_width, td->i->native_height, GDK_INTERP_BILINEAR);
-    g_task_return_pointer(task, pxb, NULL);
-}
-
-void task_image_pixbuf_from_pixbuf(imageL* i, GdkPixbuf* pxb)
-{
-    g_object_ref(pxb);
-    task_pixbuf_t* task_data = (task_pixbuf_t*)g_new(task_pixbuf_t, 1);
-    task_data->i   = i;
-    task_data->pxb = pxb;
-    GTask* task = g_task_new(NULL, NULL, (GAsyncReadyCallback)task_pixbuf_cb, NULL);
-    g_task_set_task_data(task, task_data, (GDestroyNotify)task_pixbuf_destroy_notify_task_data);
-    g_task_run_in_thread(task, task_pixbuf_func);
-    g_object_unref(task);
-}
-
-
 static void task_dump_pointer_free(gpointer pointer)
 {
     if (pointer)

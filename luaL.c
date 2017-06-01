@@ -38,3 +38,28 @@ void luaL_newlib(lua_State *L, const luaL_Reg *l, const char* n)
     luaL_setfuncs(L,l,0);
     lua_setglobal(L, n);
 }
+
+static int luaH_traceback(lua_State *L)
+{
+    lua_getglobal(L, "debug");
+    lua_getfield(L, -1, "traceback");
+    lua_replace(L, -2);
+    lua_pushvalue(L, 1);
+    lua_pushinteger(L, 2);
+    lua_call(L, 2, 1);
+    return 1;
+}
+void luaH_pcall(lua_State *L, int nargs, int nresults)
+{
+    lua_pushcfunction(L, luaH_traceback);
+    lua_insert(L, - nargs - 2);
+    int error_func_pos = lua_gettop(L) - nargs - 1;
+    if (lua_pcall(L, nargs, nresults, -nargs - 2))
+    {
+        warn("%s", lua_tostring(L, -1));
+        lua_pop(L, 2);
+        return;
+    }
+    lua_remove(L, error_func_pos);
+}
+

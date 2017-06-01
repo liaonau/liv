@@ -25,6 +25,7 @@
 #include "imageL.h"
 #include "gridL.h"
 #include "frameL.h"
+#include "luaL.h"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -42,29 +43,6 @@ static lua_State* init_lua_State(void)
     luaopen_imageL(L);
     luaopen_gridL(L);
     return L;
-}
-static int luaH_traceback(lua_State *L)
-{
-    lua_getglobal(L, "debug");
-    lua_getfield(L, -1, "traceback");
-    lua_replace(L, -2);
-    lua_pushvalue(L, 1);
-    lua_pushinteger(L, 2);
-    lua_call(L, 2, 1);
-    return 1;
-}
-static void luaH_pcall(lua_State *L, int nargs, int nresults)
-{
-    lua_pushcfunction(L, luaH_traceback);
-    lua_insert(L, - nargs - 2);
-    int error_func_pos = lua_gettop(L) - nargs - 1;
-    if (lua_pcall(L, nargs, nresults, -nargs - 2))
-    {
-        warn("%s", lua_tostring(L, -1));
-        lua_pop(L, 2);
-        return;
-    }
-    lua_remove(L, error_func_pos);
 }
 static gboolean luaH_loadrc(lua_State* L, gchar* confpath)
 {
@@ -153,7 +131,7 @@ static void cb_key_func(lua_State* L, GdkEventKey* ev)
             0, //default group
             &val,
             NULL, NULL, NULL);
-    lua_pushstring(L, g_strdup(gdk_keyval_name(val)));
+    lua_pushstring(L, gdk_keyval_name(val));
     lua_pushnumber(L, val);
     luaH_pcall(L, 3, 0);
 }

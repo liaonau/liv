@@ -1,4 +1,4 @@
---[[--{{{Copyright © 2017 Roman Leonov <rliaonau@gmail.com>
+--[[{{{Copyright © 2017 Roman Leonov <rliaonau@gmail.com>
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -11,7 +11,223 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
---]]--}}}
+--}}}]]
+--{{{ документация
+
+--- Конфигурационный скрипт программы Liv.
+--  @module rc
+--  @author Roman Leonov (Роман Леонов)
+--  @copyright © 2017 Roman Leonov <rliaonau@gmail.com>
+--  @license GNU General Public License version 3
+
+--- app — Таблица интерфейс к C API.
+-- @section app
+
+--- Строка заголовка окна программы.
+-- @field title string
+
+--- Таблица статуса программы.
+-- @field status table. Поля right, left — string. visible — boolean.
+
+--- Таблица состояния ползунков прокрутки.
+-- @field scroll table. Поля w, h, min_w, min_h, max_v, max_h.
+
+--- Текущий отображаемый виджет.
+-- @field display userdata типа frameL или gridL.
+
+--- Текущий размер, отведенный под основной виджет.
+-- @function content_size
+-- @return Ширина.
+-- @return Высота.
+
+--- Текущий размер окна программы.
+-- @function window_size
+-- @return Ширина.
+-- @return Высота.
+
+--- Изменение текущего размера окна программы.
+-- @function resize
+-- @param width Ширина.
+-- @param height Высота.
+
+--- Завершение работы программы.
+-- @function quit
+
+--- Применение каскадной таблицы стилей.
+-- @function style
+-- @param css Строка CSS.
+
+--- Хэш имени файла.
+-- @function hash
+-- @param path Имя файла.
+-- @return Хэш.
+
+--- MD5 сумма файла.
+-- @function digest
+-- @param path Имя файла.
+-- @return Строка с MD5 суммой.
+
+--- Значения путей директорий стандарта XDG.
+-- @function xdg
+-- @return Таблица с полями home, cache, config и data.
+
+--- Создание директории.
+-- @function mk_dir
+-- @param path Путь.
+-- @param mode Маска доступа.
+-- @return Успех — boolean.
+
+--- Проверка является ли путь директорией.
+-- @function is_dir
+-- @param path Путь.
+-- @return Успех — boolean.
+
+--- Проверка является ли файл обычным файлом.
+-- @function is_file
+-- @param path Путь.
+-- @return Успех — boolean.
+
+--- image.
+-- @section image
+
+--- Создание нового изображения.
+-- @function image.new
+-- @param path Путь.
+-- @param memorize кэшировать ли в память пиксельный буфер.
+-- @return Изображение.
+
+--- Информация об изображении.
+-- @function image.info
+-- @param path Путь.
+-- @return Формат.
+-- @return Ширина.
+-- @return Высота.
+
+--- Изображение.
+-- @type image
+
+--- Нативная ширина изображения.
+-- @field native_width number (ro).
+
+--- Нативная высота изображения.
+-- @field native_height number (ro).
+
+--- Текущая ширина изображения.
+-- @field width number (ro).
+
+--- Текущая высота изображения.
+-- @field height number (ro).
+
+--- Текущее состояние изображения.
+-- @field state number [0-7] (ro).
+
+--- Повернуто ли изображение.
+-- @field swapped boolean (ro).
+
+--- Возможно ли отображение изображения на экране.
+-- @field broken boolean (ro).
+
+--- Возможна ли запись изображения на диск в родном формате.
+-- @field writeable boolean (ro).
+
+--- Кэширован ли пиксельный буфер изображения в оперативную память.
+-- @field memorized boolean (ro).
+
+--- Формат изображения.
+-- @field format string (ro).
+
+--- Поворот изображения на угол  π/2.
+-- @function rotate
+-- @param clockwise Направление по часовой стрелке — boolean.
+
+--- Отражение изображения относительно центральной оси симметрии.
+-- @function flip
+-- @param horizontal Горизонтальна ли ось — boolean.
+
+--- Установка состояния изображения.
+-- @function set_state
+-- @param state number [0-7].
+
+--- Масштабирование изображения.
+-- @function scale
+-- @param width number > 0.
+-- @param height number > 0.
+
+--- Сброс состояния и масштаба изображения к значениям по умолчанию.
+-- @function reset
+
+--- Запись изображения на диск.
+-- @function dump
+-- @param path Путь.
+
+--- frame.
+-- @section frame
+
+--- Создание нового фрейма.
+-- @function frame.new
+-- @return Фрейм.
+
+--- Фрейм с изображением и меткой.
+-- @type frame
+
+--- Текущее изображение фрейма.
+-- @field image Изображение.
+
+--- Текущая метка фрейма.
+-- @field label Строка.
+
+--- Текущее CSS имя фрейма.
+-- @field name Строка.
+
+--- Очистка фрейма.
+-- @function clean
+
+--- Добавление CSS класса фрейма.
+-- @function class_add
+-- @param class Строка.
+
+--- Удаление CSS класса фрейма.
+-- @function class_remove
+-- @param class Строка.
+
+--- Получение предпочитаемого размера фрейма.
+-- @function preferred_size
+-- @return Ширина.
+-- @return Высота.
+
+--- Установка размера отображения изображения фрейма.
+-- @function size_request
+-- @param width Ширина.
+-- @param height Высота.
+
+--- grid.
+-- @section grid
+
+--- Создание новой сетки.
+-- @function grid.new
+-- @return Сетка.
+
+--- Сетка фреймов.
+-- @type grid
+
+--- Расстояние между фреймами.
+-- @field spacing Таблица. Поля row и column — number.
+
+--- Очистка сетки.
+-- @function clear
+
+--- Добавление фрейма в определенную позицию в сетки.
+-- @function attach
+-- @param f Фрейм.
+-- @param row Строка.
+-- @param column Столбец.
+
+--- Удаление фрейма из определенной позиции сетки.
+-- @function detach
+-- @param row Строка.
+-- @param column Столбец.
+
+--}}}
 --{{{G, opts     : глобальные переменные
 rex = require('rex_pcre')
 picture = frame.new()
@@ -50,14 +266,15 @@ setmetatable(_G, {--{{{
     __index = function(t, k)
         if     (k == 'IDX') then return state.idx
         elseif (k == 'IMG') then return pics[state.idx].image
-        elseif (k == 'TMB') then return pics[state.idx].thumb
         elseif (k == 'PIC') then return pics[state.idx]
         else return rawget(t, k)
         end
     end,
     __newindex = function(t, k, v)
-        if     (k == 'IDX') then state.idx     = v
-        else                rawset(t, k, v)
+        if (k == 'IDX') then
+            state.idx = v
+        else
+            rawset(t, k, v)
         end
     end,
 })--}}}
@@ -714,6 +931,14 @@ print = function()--{{{
     end
 end,
 --}}}
+print_zero = function()--{{{
+    for idx, pic in ipairs(pics) do
+        if (pic.mark) then
+            io.stdout:write(pic.path..'\0')
+        end
+    end
+end,
+--}}}
 }
 --}}}
 --{{{dims        : вычисления размеров изображений
@@ -915,7 +1140,7 @@ preview_step = function(left_step, top_step) --{{{
         v = scr.v + ih * top_step,
     }
 end,
-----}}}
+--}}}
 preview_set = function(left, top) --{{{
     local iw, ih = thumbler.item_size()
     app.scroll =
@@ -924,7 +1149,7 @@ preview_set = function(left, top) --{{{
         v = (top  - 1) * ih,
     }
 end,
-----}}}
+--}}}
 preview_adjust_to_current = function()--{{{
     local w,  h  = thumbler.item_size()
     local cl, ct = thumbler.pos_by_idx(IDX)
@@ -939,20 +1164,20 @@ preview_adjust_to_current = function()--{{{
         scroller.preview_set(l, t)
     end
 end,
-----}}}
+--}}}
 preview_center = function(left, top) --{{{
     local iw, ih = thumbler.item_size()
     local cw, ch = app.content_size()
     local R,  C  = math.round(cw/(2*iw)), math.round(ch/(2*ih))
     scroller.preview_set(math.max(1, left - R), math.max(1, top - C))
 end,
-----}}}
+--}}}
 preview_center_on_current = function() --{{{
     scroller.preview_center(thumbler.pos_by_idx(IDX))
 end,
-----}}}
+--}}}
 }
----}}}
+--}}}
 --{{{dumper      : сохранение изображений
 dumper =
 {
@@ -1124,8 +1349,8 @@ hotkeys =
         {{         }, "BackSpace", function() navigator.prev()  end},
 
         {{"Shift"  }, "q",      function() app.quit() end},
-        {{         }, "q",      function() marker.print(); app.quit() end},
-        {{"Shift"  }, "Return", function() marker.print(); app.quit() end},
+        {{         }, "q",      function() marker.print();      app.quit() end},
+        {{"Control"}, "q",      function() marker.print_zero(); app.quit() end},
 
         {{         }, "t",      function() viewer.toggle_display() end},
         {{         }, "Return", function() viewer.toggle_display() end},
@@ -1215,7 +1440,7 @@ for n=0, 9 do
 end
 --}}}
 --}}}
---{{{callbacks   : колбеки
+--{{{callbacks   : коллбэки
 callbacks =
 {
 size = function(x, y, w, h)--{{{

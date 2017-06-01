@@ -1,0 +1,1284 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>Reference</title>
+    <link rel="stylesheet" href="ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>ldoc</h1>
+
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#app__________________________________________C_API">app — Таблица интерфейс к C API </a></li>
+<li><a href="#image">image </a></li>
+<li><a href="#Class_image">Class image </a></li>
+<li><a href="#frame">frame </a></li>
+<li><a href="#Class_frame">Class frame </a></li>
+<li><a href="#grid">grid </a></li>
+<li><a href="#Class_grid">Class grid </a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><strong>rc</strong></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>rc</code></h1>
+<p>Конфигурационный скрипт программы Liv.</p>
+<p></p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Copyright</strong>: © 2017 Roman Leonov <rliaonau@gmail.com></li>
+        <li><strong>License</strong>: GNU General Public License version 3</li>
+        <li><strong>Author</strong>: Roman Leonov (Роман Леонов)</li>
+    </ul>
+
+
+<h2><a href="#app__________________________________________C_API">app — Таблица интерфейс к C API </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#title">title</a></td>
+	<td class="summary">Строка заголовка окна программы.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#status">status</a></td>
+	<td class="summary">Таблица статуса программы.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#scroll">scroll</a></td>
+	<td class="summary">Таблица состояния ползунков прокрутки.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#display">display</a></td>
+	<td class="summary">Текущий отображаемый виджет.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#content_size">content_size ()</a></td>
+	<td class="summary">Текущий размер, отведенный под основной виджет.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#window_size">window_size ()</a></td>
+	<td class="summary">Текущий размер окна программы.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#resize">resize (width, height)</a></td>
+	<td class="summary">Изменение текущего размера окна программы.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#quit">quit ()</a></td>
+	<td class="summary">Завершение работы программы.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#style">style (css)</a></td>
+	<td class="summary">Применение каскадной таблицы стилей.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#hash">hash (path)</a></td>
+	<td class="summary">Хэш имени файла.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#digest">digest (path)</a></td>
+	<td class="summary">MD5 сумма файла.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#xdg">xdg ()</a></td>
+	<td class="summary">Значения путей директорий стандарта XDG.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#mk_dir">mk_dir (path, mode)</a></td>
+	<td class="summary">Создание директории.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#is_dir">is_dir (path)</a></td>
+	<td class="summary">Проверка является ли путь директорией.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#is_file">is_file (path)</a></td>
+	<td class="summary">Проверка является ли файл обычным файлом.</td>
+	</tr>
+</table>
+<h2><a href="#image">image </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#image.new">image.new (path, memorize)</a></td>
+	<td class="summary">Создание нового изображения.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.info">image.info (path)</a></td>
+	<td class="summary">Информация об изображении.</td>
+	</tr>
+</table>
+<h2><a href="#Class_image">Class image </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#image.native_width">image.native_width</a></td>
+	<td class="summary">Нативная ширина изображения.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.native_height">image.native_height</a></td>
+	<td class="summary">Нативная высота изображения.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.width">image.width</a></td>
+	<td class="summary">Текущая ширина изображения.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.height">image.height</a></td>
+	<td class="summary">Текущая высота изображения.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.state">image.state</a></td>
+	<td class="summary">Текущее состояние изображения.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.swapped">image.swapped</a></td>
+	<td class="summary">Повернуто ли изображение.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.broken">image.broken</a></td>
+	<td class="summary">Возможно ли отображение изображения на экране.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.writeable">image.writeable</a></td>
+	<td class="summary">Возможна ли запись изображения на диск в родном формате.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.memorized">image.memorized</a></td>
+	<td class="summary">Кэширован ли пиксельный буфер изображения в оперативную память.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image.format">image.format</a></td>
+	<td class="summary">Формат изображения.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image:rotate">image:rotate (clockwise)</a></td>
+	<td class="summary">Поворот изображения на угол  π/2.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image:flip">image:flip (horizontal)</a></td>
+	<td class="summary">Отражение изображения относительно центральной оси симметрии.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image:set_state">image:set_state (state)</a></td>
+	<td class="summary">Установка состояния изображения.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image:scale">image:scale (width, height)</a></td>
+	<td class="summary">Масштабирование изображения.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image:reset">image:reset ()</a></td>
+	<td class="summary">Сброс состояния и масштаба изображения к значениям по умолчанию.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#image:dump">image:dump (path)</a></td>
+	<td class="summary">Запись изображения на диск.</td>
+	</tr>
+</table>
+<h2><a href="#frame">frame </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#frame.new">frame.new ()</a></td>
+	<td class="summary">Создание нового фрейма.</td>
+	</tr>
+</table>
+<h2><a href="#Class_frame">Class frame </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#frame.image">frame.image</a></td>
+	<td class="summary">Текущее изображение фрейма.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#frame.label">frame.label</a></td>
+	<td class="summary">Текущая метка фрейма.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#frame.name">frame.name</a></td>
+	<td class="summary">Текущее CSS имя фрейма.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#frame:clean">frame:clean ()</a></td>
+	<td class="summary">Очистка фрейма.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#frame:class_add">frame:class_add (class)</a></td>
+	<td class="summary">Добавление CSS класса фрейма.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#frame:class_remove">frame:class_remove (class)</a></td>
+	<td class="summary">Удаление CSS класса фрейма.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#frame:preferred_size">frame:preferred_size ()</a></td>
+	<td class="summary">Получение предпочитаемого размера фрейма.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#frame:size_request">frame:size_request (width, height)</a></td>
+	<td class="summary">Установка размера отображения изображения фрейма.</td>
+	</tr>
+</table>
+<h2><a href="#grid">grid </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#grid.new">grid.new ()</a></td>
+	<td class="summary">Создание новой сетки.</td>
+	</tr>
+</table>
+<h2><a href="#Class_grid">Class grid </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#grid.spacing">grid.spacing</a></td>
+	<td class="summary">Расстояние между фреймами.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#grid:clear">grid:clear ()</a></td>
+	<td class="summary">Очистка сетки.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#grid:attach">grid:attach (f, row, column)</a></td>
+	<td class="summary">Добавление фрейма в определенную позицию в сетки.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#grid:detach">grid:detach (row, column)</a></td>
+	<td class="summary">Удаление фрейма из определенной позиции сетки.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="app__________________________________________C_API"></a>app — Таблица интерфейс к C API </h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "title"></a>
+    <strong>title</strong>
+    </dt>
+    <dd>
+    Строка заголовка окна программы.
+
+
+    <ul>
+        <li><span class="parameter">title</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "status"></a>
+    <strong>status</strong>
+    </dt>
+    <dd>
+    Таблица статуса программы.
+
+
+    <ul>
+        <li><span class="parameter">status</span>
+         table. Поля right, left — string. visible — boolean.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "scroll"></a>
+    <strong>scroll</strong>
+    </dt>
+    <dd>
+    Таблица состояния ползунков прокрутки.
+
+
+    <ul>
+        <li><span class="parameter">scroll</span>
+         table. Поля w, h, min_w, min_h, max_v, max_h.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "display"></a>
+    <strong>display</strong>
+    </dt>
+    <dd>
+    Текущий отображаемый виджет.
+
+
+    <ul>
+        <li><span class="parameter">display</span>
+         userdata типа frameL или gridL.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "content_size"></a>
+    <strong>content_size ()</strong>
+    </dt>
+    <dd>
+    Текущий размер, отведенный под основной виджет.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+        Ширина.</li>
+        <li>
+        Высота.</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "window_size"></a>
+    <strong>window_size ()</strong>
+    </dt>
+    <dd>
+    Текущий размер окна программы.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+        Ширина.</li>
+        <li>
+        Высота.</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "resize"></a>
+    <strong>resize (width, height)</strong>
+    </dt>
+    <dd>
+    Изменение текущего размера окна программы.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">width</span>
+         Ширина.
+        </li>
+        <li><span class="parameter">height</span>
+         Высота.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "quit"></a>
+    <strong>quit ()</strong>
+    </dt>
+    <dd>
+    Завершение работы программы.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "style"></a>
+    <strong>style (css)</strong>
+    </dt>
+    <dd>
+    Применение каскадной таблицы стилей.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">css</span>
+         Строка CSS.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "hash"></a>
+    <strong>hash (path)</strong>
+    </dt>
+    <dd>
+    Хэш имени файла.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">path</span>
+         Имя файла.
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Хэш.
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "digest"></a>
+    <strong>digest (path)</strong>
+    </dt>
+    <dd>
+    MD5 сумма файла.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">path</span>
+         Имя файла.
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Строка с MD5 суммой.
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "xdg"></a>
+    <strong>xdg ()</strong>
+    </dt>
+    <dd>
+    Значения путей директорий стандарта XDG.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Таблица с полями home, cache, config и data.
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "mk_dir"></a>
+    <strong>mk_dir (path, mode)</strong>
+    </dt>
+    <dd>
+    Создание директории.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">path</span>
+         Путь.
+        </li>
+        <li><span class="parameter">mode</span>
+         Маска доступа.
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Успех — boolean.
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "is_dir"></a>
+    <strong>is_dir (path)</strong>
+    </dt>
+    <dd>
+    Проверка является ли путь директорией.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">path</span>
+         Путь.
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Успех — boolean.
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "is_file"></a>
+    <strong>is_file (path)</strong>
+    </dt>
+    <dd>
+    Проверка является ли файл обычным файлом.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">path</span>
+         Путь.
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Успех — boolean.
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="image"></a>image </h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "image.new"></a>
+    <strong>image.new (path, memorize)</strong>
+    </dt>
+    <dd>
+    Создание нового изображения.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">path</span>
+         Путь.
+        </li>
+        <li><span class="parameter">memorize</span>
+         кэшировать ли в память пиксельный буфер.
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Изображение.
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.info"></a>
+    <strong>image.info (path)</strong>
+    </dt>
+    <dd>
+    Информация об изображении.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">path</span>
+         Путь.
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+        Формат.</li>
+        <li>
+        Ширина.</li>
+        <li>
+        Высота.</li>
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header has-description"><a name="Class_image"></a>Class image </h2>
+
+          <div class="section-description">
+          Изображение.
+          </div>
+    <dl class="function">
+    <dt>
+    <a name = "image.native_width"></a>
+    <strong>image.native_width</strong>
+    </dt>
+    <dd>
+    Нативная ширина изображения.
+
+
+    <ul>
+        <li><span class="parameter">native_width</span>
+         number (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.native_height"></a>
+    <strong>image.native_height</strong>
+    </dt>
+    <dd>
+    Нативная высота изображения.
+
+
+    <ul>
+        <li><span class="parameter">native_height</span>
+         number (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.width"></a>
+    <strong>image.width</strong>
+    </dt>
+    <dd>
+    Текущая ширина изображения.
+
+
+    <ul>
+        <li><span class="parameter">width</span>
+         number (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.height"></a>
+    <strong>image.height</strong>
+    </dt>
+    <dd>
+    Текущая высота изображения.
+
+
+    <ul>
+        <li><span class="parameter">height</span>
+         number (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.state"></a>
+    <strong>image.state</strong>
+    </dt>
+    <dd>
+    Текущее состояние изображения.
+
+
+    <ul>
+        <li><span class="parameter">state</span>
+         number [0-7] (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.swapped"></a>
+    <strong>image.swapped</strong>
+    </dt>
+    <dd>
+    Повернуто ли изображение.
+
+
+    <ul>
+        <li><span class="parameter">swapped</span>
+         boolean (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.broken"></a>
+    <strong>image.broken</strong>
+    </dt>
+    <dd>
+    Возможно ли отображение изображения на экране.
+
+
+    <ul>
+        <li><span class="parameter">broken</span>
+         boolean (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.writeable"></a>
+    <strong>image.writeable</strong>
+    </dt>
+    <dd>
+    Возможна ли запись изображения на диск в родном формате.
+
+
+    <ul>
+        <li><span class="parameter">writeable</span>
+         boolean (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.memorized"></a>
+    <strong>image.memorized</strong>
+    </dt>
+    <dd>
+    Кэширован ли пиксельный буфер изображения в оперативную память.
+
+
+    <ul>
+        <li><span class="parameter">memorized</span>
+         boolean (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image.format"></a>
+    <strong>image.format</strong>
+    </dt>
+    <dd>
+    Формат изображения.
+
+
+    <ul>
+        <li><span class="parameter">format</span>
+         string (ro).
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image:rotate"></a>
+    <strong>image:rotate (clockwise)</strong>
+    </dt>
+    <dd>
+    Поворот изображения на угол  π/2.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">clockwise</span>
+         Направление по часовой стрелке — boolean.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image:flip"></a>
+    <strong>image:flip (horizontal)</strong>
+    </dt>
+    <dd>
+    Отражение изображения относительно центральной оси симметрии.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horizontal</span>
+         Горизонтальна ли ось — boolean.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image:set_state"></a>
+    <strong>image:set_state (state)</strong>
+    </dt>
+    <dd>
+    Установка состояния изображения.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">state</span>
+         number [0-7].
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image:scale"></a>
+    <strong>image:scale (width, height)</strong>
+    </dt>
+    <dd>
+    Масштабирование изображения.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">width</span>
+         number > 0.
+        </li>
+        <li><span class="parameter">height</span>
+         number > 0.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image:reset"></a>
+    <strong>image:reset ()</strong>
+    </dt>
+    <dd>
+    Сброс состояния и масштаба изображения к значениям по умолчанию.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "image:dump"></a>
+    <strong>image:dump (path)</strong>
+    </dt>
+    <dd>
+    Запись изображения на диск.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">path</span>
+         Путь.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="frame"></a>frame </h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "frame.new"></a>
+    <strong>frame.new ()</strong>
+    </dt>
+    <dd>
+    Создание нового фрейма.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Фрейм.
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header has-description"><a name="Class_frame"></a>Class frame </h2>
+
+          <div class="section-description">
+          Фрейм с изображением и меткой.
+          </div>
+    <dl class="function">
+    <dt>
+    <a name = "frame.image"></a>
+    <strong>frame.image</strong>
+    </dt>
+    <dd>
+    Текущее изображение фрейма.
+
+
+    <ul>
+        <li><span class="parameter">image</span>
+         Изображение.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "frame.label"></a>
+    <strong>frame.label</strong>
+    </dt>
+    <dd>
+    Текущая метка фрейма.
+
+
+    <ul>
+        <li><span class="parameter">label</span>
+         Строка.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "frame.name"></a>
+    <strong>frame.name</strong>
+    </dt>
+    <dd>
+    Текущее CSS имя фрейма.
+
+
+    <ul>
+        <li><span class="parameter">name</span>
+         Строка.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "frame:clean"></a>
+    <strong>frame:clean ()</strong>
+    </dt>
+    <dd>
+    Очистка фрейма.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "frame:class_add"></a>
+    <strong>frame:class_add (class)</strong>
+    </dt>
+    <dd>
+    Добавление CSS класса фрейма.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">class</span>
+         Строка.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "frame:class_remove"></a>
+    <strong>frame:class_remove (class)</strong>
+    </dt>
+    <dd>
+    Удаление CSS класса фрейма.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">class</span>
+         Строка.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "frame:preferred_size"></a>
+    <strong>frame:preferred_size ()</strong>
+    </dt>
+    <dd>
+    Получение предпочитаемого размера фрейма.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+        Ширина.</li>
+        <li>
+        Высота.</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "frame:size_request"></a>
+    <strong>frame:size_request (width, height)</strong>
+    </dt>
+    <dd>
+    Установка размера отображения изображения фрейма.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">width</span>
+         Ширина.
+        </li>
+        <li><span class="parameter">height</span>
+         Высота.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="grid"></a>grid </h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "grid.new"></a>
+    <strong>grid.new ()</strong>
+    </dt>
+    <dd>
+    Создание новой сетки.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        Сетка.
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header has-description"><a name="Class_grid"></a>Class grid </h2>
+
+          <div class="section-description">
+          Сетка фреймов.
+          </div>
+    <dl class="function">
+    <dt>
+    <a name = "grid.spacing"></a>
+    <strong>grid.spacing</strong>
+    </dt>
+    <dd>
+    Расстояние между фреймами.
+
+
+    <ul>
+        <li><span class="parameter">spacing</span>
+         Таблица. Поля row и column — number.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "grid:clear"></a>
+    <strong>grid:clear ()</strong>
+    </dt>
+    <dd>
+    Очистка сетки.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "grid:attach"></a>
+    <strong>grid:attach (f, row, column)</strong>
+    </dt>
+    <dd>
+    Добавление фрейма в определенную позицию в сетки.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">f</span>
+         Фрейм.
+        </li>
+        <li><span class="parameter">row</span>
+         Строка.
+        </li>
+        <li><span class="parameter">column</span>
+         Столбец.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "grid:detach"></a>
+    <strong>grid:detach (row, column)</strong>
+    </dt>
+    <dd>
+    Удаление фрейма из определенной позиции сетки.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">row</span>
+         Строка.
+        </li>
+        <li><span class="parameter">column</span>
+         Столбец.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
+<i style="float:right;">Last updated 2017-06-01 21:12:43 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>
