@@ -163,6 +163,37 @@ static void cb_button(GtkWidget* widget, GdkEventButton* ev, gpointer data)
     LUA_IF_CB_FUNCTION(data, "button", cb_button_func, ev);
 }
 
+static void cb_scroll_func(lua_State* L, gpointer data)
+{
+    GtkAdjustment* adj = (GtkAdjustment*)data;
+    if (adj == hadj)
+        lua_pushstring(L, "h");
+    else
+        lua_pushstring(L, "v");
+    lua_newtable(L);
+    if (adj == hadj)
+    {
+        GET_ADJ(h, value, "val");
+        GET_ADJ(h, lower, "min");
+        GET_ADJ(h, upper, "max");
+    }
+    else
+    {
+        GET_ADJ(v, value, "val");
+        GET_ADJ(v, lower, "min");
+        GET_ADJ(v, upper, "max");
+    }
+    luaH_pcall(L, 2, 0);
+}
+static void cb_scroll(GtkAdjustment* adj, gpointer data)
+{
+    LUA_IF_CB_FUNCTION(data, "scroll", cb_scroll_func, adj);
+}
+static void cb_scroll_val(GtkAdjustment* adj, gpointer data)
+{
+    LUA_IF_CB_FUNCTION(data, "scroll_value", cb_scroll_func, adj);
+}
+
 gint main(gint argc, gchar **argv)
 {
     setlocale(LC_ALL, "");
@@ -220,6 +251,8 @@ gint main(gint argc, gchar **argv)
     mainbox    = (GtkBox*)gtk_box_new(GTK_ORIENTATION_VERTICAL,   0);
     statusbox  = (GtkBox*)gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     scroll     = (GtkScrolledWindow*)gtk_scrolled_window_new(NULL, NULL);
+    hadj       = gtk_scrolled_window_get_hadjustment(scroll);
+    vadj       = gtk_scrolled_window_get_vadjustment(scroll);
     displayref = LUA_REFNIL;
     { /* scroll */
         gtk_widget_set_hexpand((GtkWidget*)scroll, TRUE);
@@ -265,6 +298,10 @@ gint main(gint argc, gchar **argv)
         g_signal_connect(window, "key-press-event",    G_CALLBACK(cb_key),        (gpointer)L);
         g_signal_connect(window, "size-allocate",      G_CALLBACK(cb_size),       (gpointer)L);
         g_signal_connect(window, "button-press-event", G_CALLBACK(cb_button),     (gpointer)L);
+        g_signal_connect(hadj,   "changed",            G_CALLBACK(cb_scroll),     (gpointer)L);
+        g_signal_connect(hadj,   "value-changed",      G_CALLBACK(cb_scroll_val), (gpointer)L);
+        g_signal_connect(vadj,   "changed",            G_CALLBACK(cb_scroll),     (gpointer)L);
+        g_signal_connect(vadj,   "value-changed",      G_CALLBACK(cb_scroll_val), (gpointer)L);
     }
 
     gtk_widget_show_all((GtkWidget*)window);

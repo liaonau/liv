@@ -181,10 +181,27 @@ static int size_request_frameL(lua_State* L)
 static int preferred_size_frameL(lua_State* L)
 {
     frameL* f = (frameL*)luaL_checkudata(L, 1, FRAME);
-    GtkRequisition nat;
-    gtk_widget_get_preferred_size((GtkWidget*)f->frame, NULL, &nat);
-    lua_pushnumber(L, nat.width);
-    lua_pushnumber(L, nat.height);
+    GtkRequisition rq;
+    gtk_widget_get_preferred_size((GtkWidget*)f->frame, NULL, &rq);
+    gint nw = rq.width;
+    gint nh = rq.height;
+    gtk_widget_get_preferred_size((GtkWidget*)f->image, NULL, &rq);
+    gint rw = rq.width;
+    gint rh = rq.height;
+    gint iw = rw;
+    gint ih = rh;
+    lua_rawgeti(L, LUA_REGISTRYINDEX, f->ref);
+    if (lua_isuserdata(L, -1))
+    {
+        imageL* i = (imageL*)luaL_checkudata(L, -1, IMAGE);
+        iw = i->width;
+        ih = i->height;
+    }
+    lua_pop(L, 1);
+    gint w = nw - rw + iw;
+    gint h = nh - rh + ih;
+    lua_pushnumber(L, w);
+    lua_pushnumber(L, h);
     return 2;
 }
 static int class_add_frameL(lua_State* L)

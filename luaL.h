@@ -24,6 +24,25 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
+#define GET_ADJ(dir, type, field)                  \
+    {                                              \
+        gdouble val;                               \
+        val = gtk_adjustment_get_##type(dir##adj); \
+        lua_pushnumber(L, val);                    \
+        lua_setfield(L, -2, field);                \
+    }
+
+#define SET_ADJ(num, dir, type, field)                \
+    {                                                 \
+        gdouble tmp, val;                             \
+        tmp = gtk_adjustment_get_##type(dir##adj);    \
+        lua_getfield(L, num, field);                  \
+        val = luaL_optnumber(L, -1, tmp);             \
+        lua_pop(L, 1);                                \
+        if (tmp != val)                               \
+            gtk_adjustment_set_##type(dir##adj, val); \
+    }
+
 #define CASE_FUNC(name, udatatype)                   \
     if (g_strcmp0(field, #name) == 0)                \
     {                                                \

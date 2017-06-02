@@ -293,6 +293,12 @@ static int gc_imageL(lua_State *L)
         g_object_unref(i->pxb);
     return 0;
 }
+static int tostring_imageL(lua_State *L)
+{
+    luaL_checkudata(L, 1, IMAGE);
+    lua_pushstring(L, IMAGE);
+    return 1;
+}
 static int index_imageL(lua_State *L)
 {
     imageL *i = (imageL*)luaL_checkudata(L, 1, IMAGE);
@@ -329,9 +335,10 @@ static const struct luaL_Reg imageLlib_f [] =
 };
 static const struct luaL_Reg imageLlib_m [] =
 {
-    {"__gc",    gc_imageL   },
-    {"__index", index_imageL},
-    {NULL,      NULL        }
+    {"__gc",       gc_imageL      },
+    {"__tostring", tostring_imageL},
+    {"__index",    index_imageL   },
+    {NULL,         NULL           }
 };
 int luaopen_imageL(lua_State *L)
 {

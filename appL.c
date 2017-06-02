@@ -115,49 +115,40 @@ static int status_set_appL(lua_State *L)
     return 0;
 }
 
-static int scroll_get_appL(lua_State *L)
+static int hscroll_get_appL(lua_State *L)
 {
-    GtkAdjustment* hor_adjustment = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
-    GtkAdjustment* ver_adjustment = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
     lua_newtable(L);
-#define GET_ADJ(direction, type, field)                            \
-    {                                                              \
-        gdouble val;                                               \
-        val = gtk_adjustment_get_##type(direction##_##adjustment); \
-        lua_pushnumber(L, val);                                    \
-        lua_setfield(L, -2, field);                                \
-    }
-    GET_ADJ(hor, value, "h");
-    GET_ADJ(ver, value, "v");
-    GET_ADJ(hor, lower, "min_h");
-    GET_ADJ(ver, lower, "min_v");
-    GET_ADJ(hor, upper, "max_h");
-    GET_ADJ(ver, upper, "max_v");
+    GET_ADJ(h, value, "val");
+    GET_ADJ(h, lower, "min");
+    GET_ADJ(h, upper, "max");
     return 1;
 }
-static int scroll_set_appL(lua_State *L)
+static int hscroll_set_appL(lua_State *L)
 {
     if (lua_istable(L, 2))
     {
-        GtkAdjustment* hor_adjustment = gtk_scrolled_window_get_hadjustment((GtkScrolledWindow*)scroll);
-        GtkAdjustment* ver_adjustment = gtk_scrolled_window_get_vadjustment((GtkScrolledWindow*)scroll);
-#define SET_ADJ(direction, type, field)                                   \
-        {                                                                 \
-            gdouble tmp, val;                                             \
-            tmp = gtk_adjustment_get_##type(direction##_##adjustment);    \
-            lua_getfield(L, 2, field);                                    \
-            val = luaL_optnumber(L, -1, tmp);                             \
-            lua_pop(L, 1);                                                \
-            if (tmp != val)                                               \
-                gtk_adjustment_set_##type(direction##_##adjustment, val); \
-        }
+        SET_ADJ(2, h, lower, "min");
+        SET_ADJ(2, h, upper, "max");
+        SET_ADJ(2, h, value, "val");
+    }
+    return 0;
+}
 
-        SET_ADJ(hor, value, "h");
-        SET_ADJ(ver, value, "v");
-        SET_ADJ(hor, lower, "min_h");
-        SET_ADJ(ver, lower, "min_v");
-        SET_ADJ(hor, upper, "max_h");
-        SET_ADJ(ver, upper, "max_v");
+static int vscroll_get_appL(lua_State *L)
+{
+    lua_newtable(L);
+    GET_ADJ(v, value, "val");
+    GET_ADJ(v, lower, "min");
+    GET_ADJ(v, upper, "max");
+    return 1;
+}
+static int vscroll_set_appL(lua_State *L)
+{
+    if (lua_istable(L, 2))
+    {
+        SET_ADJ(2, v, lower, "min");
+        SET_ADJ(2, v, upper, "max");
+        SET_ADJ(2, v, value, "val");
     }
     return 0;
 }
@@ -267,7 +258,8 @@ static int index_appL(lua_State *L)
 
     INDEX_FIELD( title,   app );
     INDEX_FIELD( status,  app );
-    INDEX_FIELD( scroll,  app );
+    INDEX_FIELD( hscroll, app );
+    INDEX_FIELD( vscroll, app );
     INDEX_FIELD( display, app );
 
     CASE_FUNC( quit,    app );
@@ -290,7 +282,8 @@ static int newindex_appL(lua_State *L)
     const gchar* field = luaL_checkstring(L, 2);
     NEWINDEX_FIELD( title,   app );
     NEWINDEX_FIELD( status,  app );
-    NEWINDEX_FIELD( scroll,  app );
+    NEWINDEX_FIELD( hscroll, app );
+    NEWINDEX_FIELD( vscroll, app );
     NEWINDEX_FIELD( display, app );
     return 0;
 }

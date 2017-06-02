@@ -34,6 +34,8 @@
 
 GtkWindow*         window;
 GtkScrolledWindow* scroll;
+GtkAdjustment*     hadj;
+GtkAdjustment*     vadj;
 gint               displayref;
 
 GtkBox*    statusbox;

@@ -29,8 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 --- Таблица статуса программы.
 -- @field status table. Поля right, left — string. visible — boolean.
 
---- Таблица состояния ползунков прокрутки.
--- @field scroll table. Поля w, h, min_w, min_h, max_v, max_h.
+--- Таблица состояния горизонтального ползунка прокрутки.
+-- @field hscroll table. Поля val, min, max.
+
+--- Таблица состояния вертикального ползунка прокрутки.
+-- @field vscroll table. Поля val, min, max.
 
 --- Текущий отображаемый виджет.
 -- @field display userdata типа frameL или gridL.
@@ -227,6 +230,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -- @param row Строка.
 -- @param column Столбец.
 
+--- Сигналы (таблица callbacks).
+-- @section callbacks
+
+--- Сигнал изменения размера окна.
+-- @function size
+-- @within callbacks
+-- @param x Горизонтальная координата.
+-- @param y Вертикальная координата.
+-- @param w Ширина.
+-- @param h Высота.
+
+--- Сигнал нажатия клавиши.
+-- @function keypress
+-- @within callbacks
+-- @param mods Таблица модификаторов: Shift, Control, Mod1.
+-- @param name Имя клавиши в группе 0.
+-- @param value Численное значение клавиши с учетом текущей группы.
+
+--- Сигнал нажатия мыши.
+-- @function button
+-- @within callbacks
+-- @param mods Таблица модификаторов: Shift, Control, Mod1.
+-- @param name Имя кнопки.
+-- @param x Горизонтальная координата.
+-- @param y Вертикальная координата.
+
+--- Сигнал изменения текущего положения ползунка прокрутки.
+-- @function scroll_value
+-- @within callbacks
+-- @param direction Строка: 'h' — горизонталь, 'v' — вертикаль.
+-- @param scroll Таблица. Поля val, min, max.
+
+--- Сигнал изменения ползунка прокрутки (не текущего положения).
+-- @function scroll
+-- @within callbacks
+-- @param direction Строка: 'h' — горизонталь, 'v' — вертикаль.
+-- @param scroll Таблица. Поля val, min, max.
+
 --}}}
 --{{{G, opts     : глобальные переменные
 rex = require('rex_pcre')
@@ -296,11 +337,12 @@ setmetatable(
     cols     = 1,
     cols_vis = 1,
 
-    thumbsize      = thumbs.size,
-    picture_ixd    = 0,
-    picture_scroll = app.scroll,
-    preview_scroll = app.scroll,
-    delay_regrid   = false,
+    thumbsize   = thumbs.size,
+    picture_ixd = 0,
+
+    scroll       = { h = {},  v = {}  },
+    delay_scroll = { h = nil, v = nil },
+    delay_regrid = false,
 
     button =
     {
@@ -733,10 +775,11 @@ pos_by_coords = function(coords)--{{{
     local y = coords.y
     local cw, ch = app:content_size()
     local iw, ih = thumbler.item_size()
-    local scr = app.scroll
+    local hscr = app.hscroll
+    local vscr = app.vscroll
 
-    local xs = (scr.h + x - (cw / 2)) / iw
-    local ys = (scr.v + y - (ch / 2)) / ih
+    local xs = (hscr.val + x - (cw / 2)) / iw
+    local ys = (vscr.val + y - (ch / 2)) / ih
     local L = math.ceil(math.min((state.rows     / 2), (cw / (2 * iw))) + xs)
     local T = math.ceil(math.min((state.cols_vis / 2), (ch / (2 * ih))) + ys)
     return L, T
@@ -761,17 +804,15 @@ update_picture = function()--{{{
         picture:clear()
         picture.image     = IMG
         state.picture_ixd = IDX
-    else
-        scroller.picture_restore()
     end
+    state.delay_scroll = { h = IMG, v = IMG }
 end,
 --}}}
 update_preview = function()--{{{
     if (state.delay_regrid) then
         thumbler.regrid()
-    else
-        scroller.preview_adjust_to_current()
     end
+    scroller.preview_adjust_to_current()
 end,
 --}}}
 
@@ -795,6 +836,7 @@ set = function(idx) --{{{
     marker.update(oldidx)
 
     if (app.display == picture) then
+        scroller.store(pics[oldidx].image)
         viewer.update_picture()
     end
     if (app.display == preview) then
@@ -816,19 +858,15 @@ toggle_display = function() --{{{
 end,
 --}}}
 show_preview = function()--{{{
-    local restore = (app.display == picture)
-    app.display = preview
-    if (restore) then
-        scroller.picture_store()
-        scroller.preview_restore()
+    if (app.display == picture) then
+        scroller.store(IMG)
     end
+
+    app.display = preview
     viewer.update_preview()
 end,
 --}}}
 show_picture = function() --{{{
-    if (app.display == preview) then
-        scroller.preview_store()
-    end
     app.display = picture
     viewer.update_picture()
 end,
@@ -1017,7 +1055,7 @@ end,
 }
 --}}}
 --{{{transformer : масштабирование и повороты изображения
-local transformer_mt =--{{{
+transformer =
 {
 zoom_mul  = function(i, s) --{{{
     local min, max = dims.constrains(i)
@@ -1065,97 +1103,61 @@ flip   = function(i, horizontal) i:flip(horizontal)  end,
 reset  = function(i)             i:reset()           end,
 }
 --}}}
-transformer = setmetatable(--{{{
-{},
-{
-    __index = function(t, k)
-        return function (...)
-            local args = {...}
-            if (args[1] == IMG) then
-                scroller.picture_store()
-            end
-            rawget(transformer_mt, k)(...)
-            if (args[1] == IMG) then
-                scroller.picture_restore()
-            end
-        end
-    end
-})
---}}}
---}}}
 --{{{scroller    : скроллинг
 scroller =
 {
 percent = function(hor, ver) --{{{
-    local s = app.scroll
-    app.scroll =
-    {
-        h = s.h + s.max_h * hor / 100,
-        v = s.v + s.max_v * ver / 100,
-    }
+    local hs = app.hscroll
+    local vs = app.vscroll
+    app.hscroll = { val = hs.val + hs.max * hor / 100 }
+    app.vscroll = { val = vs.val + vs.max * ver / 100 }
 end,
 --}}}
 center = function()--{{{
-    local s = app.scroll
+    local hs = app.hscroll
+    local vs = app.vscroll
     local W, H = app.content_size()
-    app.scroll =
-    {
-        h = 0.5 * (s.max_h - W - s.min_h),
-        v = 0.5 * (s.max_v - H - s.min_v),
-    }
+    app.hscroll = { val = 0.5 * (hs.max - W - hs.min) }
+    app.vscroll = { val = 0.5 * (vs.max - H - vs.min) }
 end,
 --}}}
 
-picture_store = function()--{{{
-    state.picture_scroll = app.scroll
+store = function(i)--{{{
+    local hs = app.hscroll
+    local vs = app.vscroll
+    state.scroll.h[i] = app.hscroll
+    state.scroll.v[i] = app.vscroll
 end,
 --}}}
-picture_restore = function()--{{{
-    local w, h = app.content_size()
-    local oldscr = state.picture_scroll
-    local newscr = app.scroll
-    -- не работает корректно: oldscr == newscr, нужен колбек на scroll-changed
-    app.scroll =
-    {
-        h = oldscr.h * (newscr.max_h - w - newscr.min_h) / (oldscr.max_h - w - oldscr.min_h),
-        v = oldscr.v * (newscr.max_v - h - newscr.min_v) / (oldscr.max_v - h - oldscr.min_v),
-    }
+restore = function(d, i)--{{{
+    local s = state.scroll[d][i]
+    if (s) then
+        app[d..'scroll'] = s
+    end
 end,
 --}}}
 
-preview_store = function()--{{{
-    state.preview_scroll = app.scroll
-end,
---}}}
-preview_restore = function()--{{{
-    app.scroll = state.preview_scroll
-end,
---}}}
 preview_step = function(left_step, top_step) --{{{
     local iw, ih = thumbler.item_size()
-    local scr = app.scroll
-    app.scroll =
-    {
-        h = scr.h + iw * left_step,
-        v = scr.v + ih * top_step,
-    }
+    local hs = app.hscroll
+    local vs = app.vscroll
+    app.hscroll = { val = hs.val + iw * left_step }
+    app.vscroll = { val = vs.val + ih * top_step  }
 end,
 --}}}
 preview_set = function(left, top) --{{{
     local iw, ih = thumbler.item_size()
-    app.scroll =
-    {
-        h = (left - 1) * iw,
-        v = (top  - 1) * ih,
-    }
+    app.hscroll = { val = (left - 1) * iw }
+    app.vscroll = { val = (top  - 1) * ih }
 end,
 --}}}
 preview_adjust_to_current = function()--{{{
     local w,  h  = thumbler.item_size()
     local cl, ct = thumbler.pos_by_idx(IDX)
-    local scr  = app.scroll
+    local hs  = app.hscroll
+    local vs  = app.vscroll
     local W, H = app.content_size()
-    local L, T = math.ceil(scr.h / w) + 1, math.ceil(scr.v / h) + 1
+    local L, T = math.ceil(hs.val / w) + 1, math.ceil(vs.val / h) + 1
     local r, c = math.floor(W / w), math.floor(H / h)
     local visible = (cl >= L and cl + 1 <= L + r and ct >= T and ct + 1 <= T + c)
     if (not visible) then
@@ -1216,25 +1218,6 @@ end,
 --}}}
 --{{{test        : тестовая функция
 test = function()
-    for i = 1, 103 do
-        navigator.next()
-        if (i % 10 == 0) then
-            IMG:rotate()
-        end
-        if (i % 7 == 0) then
-            transformer.zoom_add(IMG, -images.zoom_step)
-        end
-        if (i % 8 == 0) then
-            transformer.zoom_add(IMG,  images.zoom_step)
-        end
-        if (i % 24 == 0) then
-            IMG:flip(true)
-        end
-        if (i % 9 == 0) then
-            IMG:reset()
-        end
-        navigator.prev()
-    end
     collectgarbage()
 end
 --}}}
@@ -1460,10 +1443,25 @@ end,
 --}}}
 button = function(mods, button, x, y)--{{{
     state.button = {x = x, y = y}
-    --print(button)
     local name  = 'button'..button
     local value = -1 * button
     steward.call(mods, name, value)
+end,
+--}}}
+scroll_value = function(d, s)--{{{
+    local item = state.delay_scroll[d]
+    if (item) then
+        state.delay_scroll[d] = nil
+        scroller.restore(d, item)
+    end
+end,
+--}}}
+scroll = function(d, s)--{{{
+    if (app.display == preview) then
+        scroller.preview_center_on_current()
+    else
+        callbacks.scroll_value(d, s)
+    end
 end,
 --}}}
 }

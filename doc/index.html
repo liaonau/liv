@@ -36,6 +36,7 @@
 <li><a href="#Class_frame">Class frame </a></li>
 <li><a href="#grid">grid </a></li>
 <li><a href="#Class_grid">Class grid </a></li>
+<li><a href="#callbacks">callbacks</a></li>
 </ul>
 
 
@@ -70,8 +71,12 @@
 	<td class="summary">Таблица статуса программы.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#scroll">scroll</a></td>
-	<td class="summary">Таблица состояния ползунков прокрутки.</td>
+	<td class="name" nowrap><a href="#hscroll">hscroll</a></td>
+	<td class="summary">Таблица состояния горизонтального ползунка прокрутки.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#vscroll">vscroll</a></td>
+	<td class="summary">Таблица состояния вертикального ползунка прокрутки.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#display">display</a></td>
@@ -268,6 +273,29 @@
 	<td class="summary">Удаление фрейма из определенной позиции сетки.</td>
 	</tr>
 </table>
+<h2><a href="#callbacks">callbacks</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#size">size (x, y, w, h)</a></td>
+	<td class="summary">Сигнал изменения размера окна.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#keypress">keypress (mods, name, value)</a></td>
+	<td class="summary">Сигнал нажатия клавиши.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#button">button (mods, name, x, y)</a></td>
+	<td class="summary">Сигнал нажатия мыши.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#scroll_value">scroll_value (direction, scroll)</a></td>
+	<td class="summary">Сигнал изменения текущего положения ползунка прокрутки.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#scroll">scroll (direction, scroll)</a></td>
+	<td class="summary">Сигнал изменения ползунка прокрутки (не текущего положения).</td>
+	</tr>
+</table>
 
 <br/>
 <br/>
@@ -315,16 +343,35 @@
 
 </dd>
     <dt>
-    <a name = "scroll"></a>
-    <strong>scroll</strong>
+    <a name = "hscroll"></a>
+    <strong>hscroll</strong>
     </dt>
     <dd>
-    Таблица состояния ползунков прокрутки.
+    Таблица состояния горизонтального ползунка прокрутки.
 
 
     <ul>
-        <li><span class="parameter">scroll</span>
-         table. Поля w, h, min_w, min_h, max_v, max_h.
+        <li><span class="parameter">hscroll</span>
+         table. Поля val, min, max.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "vscroll"></a>
+    <strong>vscroll</strong>
+    </dt>
+    <dd>
+    Таблица состояния вертикального ползунка прокрутки.
+
+
+    <ul>
+        <li><span class="parameter">vscroll</span>
+         table. Поля val, min, max.
         </li>
     </ul>
 
@@ -1271,13 +1318,147 @@
 
 </dd>
 </dl>
+    <h2 class="section-header "><a name="callbacks"></a>callbacks</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "size"></a>
+    <strong>size (x, y, w, h)</strong>
+    </dt>
+    <dd>
+    Сигнал изменения размера окна.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">x</span>
+         Горизонтальная координата.
+        </li>
+        <li><span class="parameter">y</span>
+         Вертикальная координата.
+        </li>
+        <li><span class="parameter">w</span>
+         Ширина.
+        </li>
+        <li><span class="parameter">h</span>
+         Высота.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "keypress"></a>
+    <strong>keypress (mods, name, value)</strong>
+    </dt>
+    <dd>
+    Сигнал нажатия клавиши.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">mods</span>
+         Таблица модификаторов: Shift, Control, Mod1.
+        </li>
+        <li><span class="parameter">name</span>
+         Имя клавиши в группе 0.
+        </li>
+        <li><span class="parameter">value</span>
+         Численное значение клавиши с учетом текущей группы.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "button"></a>
+    <strong>button (mods, name, x, y)</strong>
+    </dt>
+    <dd>
+    Сигнал нажатия мыши.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">mods</span>
+         Таблица модификаторов: Shift, Control, Mod1.
+        </li>
+        <li><span class="parameter">name</span>
+         Имя кнопки.
+        </li>
+        <li><span class="parameter">x</span>
+         Горизонтальная координата.
+        </li>
+        <li><span class="parameter">y</span>
+         Вертикальная координата.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "scroll_value"></a>
+    <strong>scroll_value (direction, scroll)</strong>
+    </dt>
+    <dd>
+    Сигнал изменения текущего положения ползунка прокрутки.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">direction</span>
+         Строка: 'h' — горизонталь, 'v' — вертикаль.
+        </li>
+        <li><span class="parameter">scroll</span>
+         Таблица. Поля val, min, max.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "scroll"></a>
+    <strong>scroll (direction, scroll)</strong>
+    </dt>
+    <dd>
+    Сигнал изменения ползунка прокрутки (не текущего положения).
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">direction</span>
+         Строка: 'h' — горизонталь, 'v' — вертикаль.
+        </li>
+        <li><span class="parameter">scroll</span>
+         Таблица. Поля val, min, max.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
 
 
 </div> <!-- id="content" -->
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
-<i style="float:right;">Last updated 2017-06-01 21:12:43 </i>
+<i style="float:right;">Last updated 2017-06-02 22:05:04 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
