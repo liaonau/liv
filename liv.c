@@ -32,6 +32,24 @@
 #include <locale.h>
 #include <string.h>
 
+GtkWindow*         window;
+GtkScrolledWindow* scroll;
+GtkAdjustment*     hadj;
+GtkAdjustment*     vadj;
+gint               displayref;
+
+GtkBox*    statusbox;
+GtkLabel*  status_left;
+GtkLabel*  status_right;
+
+GdkPixbuf*          BROKENpxb;
+GdkPixbuf*          LUApxb;
+GdkPixbufAnimation* DEFERREDpxb;
+GdkPixbuf*          APPpxb;
+GdkPixbuf*          LOADINGpxb;
+
+GdkPixbufFormat*    PNGformat;
+
 static lua_State* init_lua_State(void)
 {
     lua_State* L = luaL_newstate();
@@ -124,7 +142,7 @@ static void cb_key_func(lua_State* L, GdkEventKey* ev)
     }
     guint val = ev->keyval;
     gdk_keymap_translate_keyboard_state(
-            gdk_keymap_get_default(),
+            gdk_keymap_get_for_display(gdk_display_get_default()),
             ev->hardware_keycode,
             ev->state & !GDK_SHIFT_MASK,
             0, //default group

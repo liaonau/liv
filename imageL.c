@@ -164,7 +164,7 @@ static int new_imageL(lua_State *L)
     const gchar* path = luaL_checkstring(L, 1);
     gboolean memorize = lua_toboolean(L, 2);
     i->path    = g_strdup(path);
-    i->emitter = g_object_newv(G_TYPE_OBJECT, 0, NULL);
+    i->emitter = g_object_new_with_properties(G_TYPE_OBJECT, 0, NULL, NULL);
     i->pxb     = NULL;
     i->state   = 0;
     i->format  = gdk_pixbuf_get_file_info(i->path, &i->native_width, &i->native_height);

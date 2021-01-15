@@ -28,12 +28,12 @@
 
 #define PNG_FORMAT_NAME "png"
 
-static GdkPixbuf*          BROKENpxb;
-static GdkPixbuf*          LUApxb;
-static GdkPixbufAnimation* DEFERREDpxb;
-static GdkPixbuf*          APPpxb;
-static GdkPixbuf*          LOADINGpxb;
+extern GdkPixbuf*          BROKENpxb;
+extern GdkPixbuf*          LUApxb;
+extern GdkPixbufAnimation* DEFERREDpxb;
+extern GdkPixbuf*          APPpxb;
+extern GdkPixbuf*          LOADINGpxb;
 
-static GdkPixbufFormat*    PNGformat;
+extern GdkPixbufFormat*    PNGformat;
 
 gboolean init_resources(void);
