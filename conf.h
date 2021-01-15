@@ -32,13 +32,12 @@
 #define IMAGE   "image"
 #define GRID    "grid"
 
-GtkWindow*         window;
-GtkScrolledWindow* scroll;
-GtkAdjustment*     hadj;
-GtkAdjustment*     vadj;
-gint               displayref;
+static GtkWindow*         window;
+static GtkScrolledWindow* scroll;
+static GtkAdjustment*     hadj;
+static GtkAdjustment*     vadj;
+static gint               displayref;
 
-GtkBox*    statusbox;
-GtkLabel*  status_left;
-GtkLabel*  status_right;
-
+static GtkBox*    statusbox;
+static GtkLabel*  status_left;
+static GtkLabel*  status_right;

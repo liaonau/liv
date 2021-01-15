@@ -1,6 +1,6 @@
 NAME=liv
 
-PKGS = gtk+-3.0 lua
+PKGS = gtk+-3.0 lua5.1
 
 GCR = /usr/bin/glib-compile-resources
 RES = resources.xml

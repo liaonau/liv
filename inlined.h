@@ -16,6 +16,8 @@
  *
  */
 
+#pragma once
+
 #include "conf.h"
 
 #define BROKEN_NAME   "/resources/broken.png"
@@ -26,12 +28,12 @@
 
 #define PNG_FORMAT_NAME "png"
 
-GdkPixbuf*          BROKENpxb;
-GdkPixbuf*          LUApxb;
-GdkPixbufAnimation* DEFERREDpxb;
-GdkPixbuf*          APPpxb;
-GdkPixbuf*          LOADINGpxb;
+static GdkPixbuf*          BROKENpxb;
+static GdkPixbuf*          LUApxb;
+static GdkPixbufAnimation* DEFERREDpxb;
+static GdkPixbuf*          APPpxb;
+static GdkPixbuf*          LOADINGpxb;
 
-GdkPixbufFormat*    PNGformat;
+static GdkPixbufFormat*    PNGformat;
 
 gboolean init_resources(void);
