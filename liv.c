@@ -322,8 +322,6 @@ gint main(gint argc, gchar **argv)
         g_signal_connect(vadj,   "value-changed",      G_CALLBACK(cb_scroll_val), (gpointer)L);
     }
 
-    gtk_widget_show_all((GtkWidget*)window);
-
     lua_getglobal(L, "init");
     guint len = (infiles) ? infiles->len : 0;
     lua_checkstack(L, argc + len);
@@ -337,6 +335,7 @@ gint main(gint argc, gchar **argv)
     }
     luaH_pcall(L, argc + len - 1, 0);
 
+    gtk_widget_show_all((GtkWidget*)window);
     gtk_main();
 
     return 0;
